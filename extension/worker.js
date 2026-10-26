@@ -102,6 +102,8 @@ async function run(reason, mode = "check") {
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === CHECK_ALARM) void load("enabled").then((enabled) => enabled && run("alarm"));
 });
+chrome.runtime.onStartup.addListener(() => { void ensureAlarm(); });
+chrome.runtime.onInstalled.addListener(() => { void ensureAlarm(); });
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (sender.id !== chrome.runtime.id) return;
@@ -125,5 +127,6 @@ async function start() {
   await verifyInstalled(bundle);
   if (recovery && receipt?.version === version && receipt.sha256 === await sha256(bundle.active)) await save("recovery", null);
   await record({ phase: "worker-started", version, recovery: Boolean(await load("recovery")) });
+  await status(await load("recovery") ? "recovery-required" : "ready", { reason: "startup" });
 }
 void start().catch((error) => status("error", { reason: "startup", name: error.name, message: error.message }));
