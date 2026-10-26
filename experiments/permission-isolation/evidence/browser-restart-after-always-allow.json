@@ -1,0 +1,16 @@
+{
+  "Before": {
+    "MeasuredAt": "2026-10-26T14:34:07.5822407Z",
+    "AllTemporaryChromeProcessesExited": true,
+    "AfterUserSelectedAlwaysAllow": true
+  },
+  "After": {
+    "MeasuredAt": "2026-10-26T14:35:31.6712182Z",
+    "Browser": [
+      {
+        "ProcessId": 58692,
+        "CreationDate": "2026-10-26T23:34:25.421597+09:00"
+      }
+    ]
+  }
+}

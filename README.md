@@ -6,6 +6,8 @@ Windows の Chrome Stable で、開発者モードの拡張機能が GitHub Rele
 
 更新の検出・取得と、ディスクへの書き込みは分けています。保存したフォルダハンドルの権限が `granted` の場合だけ自動適用し、`prompt` や `denied` の場合は書き込まず、候補を保存してユーザーの再許可を待ちます。
 
+追加の[権限分離実験](experiments/permission-isolation/README.md)では、別HTTPSページに権限を持たせる方法で、対象拡張機能の再読み込み後も許可を維持できました。「サイトアクセス時は常に許可」の設定後は、Chrome完全再起動後にも再許可せず更新できています。この追加プローブと、ここで説明するGitHub配信処理との統合は未実装です。
+
 ## セットアップ
 
 [初期インストール用 ZIP](https://github.com/H4M4CHi-ttr/chrome-unpacked-self-update-lab/releases/latest/download/auto-update-lab.zip) を展開して使えます。ZIP の初期コード版は0.1.0です。フォルダを登録して自動更新を開始すると、公開されている新しい版を取得します。
