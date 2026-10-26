@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; object-src 'none'; base-uri 'none'">
+  <title>更新権限の分離実験</title>
+  <link rel="stylesheet" href="style.css">
+  <script type="module" src="client.js"></script>
+</head>
+<body class="tab">
+<main>
+  <header><span>PERMISSION ISOLATION PROBE</span><h1>更新権限の分離実験</h1></header>
+  <section id="demo"><h2>準備中…</h2><p></p></section>
+  <dl>
+    <div><dt>方式</dt><dd id="mode"></dd></div>
+    <div><dt>書き込み許可</dt><dd id="permission">確認中</dd></div>
+    <div><dt>画面の実行ID</dt><dd id="document"></dd></div>
+    <div><dt>対象の起動ID</dt><dd id="boot"></dd></div>
+  </dl>
+  <p class="hint">同じ拡張機能フォルダを登録してください。開始ボタン後は6秒間隔で2回更新します。書き込み先は active.js だけです。</p>
+  <div class="actions">
+    <button id="pick" disabled>対象フォルダを登録</button>
+    <button id="grant" disabled>保存フォルダを再許可</button>
+    <button id="run" disabled>2回の自動更新を開始</button>
+    <button id="web" hidden>HTTPS更新ページで開く</button>
+    <button id="restore" hidden>バックアップを復元</button>
+  </div>
+  <p id="status" role="status">起動中…</p>
+  <details><summary>検証ログ</summary><pre id="report"></pre></details>
+</main>
+</body>
+</html>

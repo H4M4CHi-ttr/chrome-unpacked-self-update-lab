@@ -1,0 +1,11 @@
+{
+  "manifest_version": 3,
+  "name": "更新権限の分離実験",
+  "version": "0.2.0",
+  "action": { "default_popup": "index.html" },
+  "background": { "service_worker": "worker.js", "type": "module" },
+  "externally_connectable": {
+    "matches": ["https://h4m4chi-ttr.github.io/chrome-unpacked-self-update-lab/isolation/*"]
+  },
+  "content_security_policy": { "extension_pages": "script-src 'self'; object-src 'none'; base-uri 'none'" }
+}
