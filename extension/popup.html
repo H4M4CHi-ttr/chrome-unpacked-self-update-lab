@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>GitHub 自己更新実験</title>
+  <link rel="stylesheet" href="popup.css">
+  <script type="module" src="popup.js"></script>
+</head>
+<body>
+<main>
+  <header><span>UNPACKED EXTENSION / GITHUB RELEASES</span><h1>GitHub 自己更新実験</h1></header>
+  <section id="demo"><h2>active.js を読み込み中…</h2><p></p></section>
+  <dl>
+    <div><dt>実行中のコード版</dt><dd id="version">確認中</dd></div>
+    <div><dt>フォルダ権限</dt><dd id="permission">未選択</dd></div>
+    <div><dt>自動更新</dt><dd id="enabled">停止中</dd></div>
+    <div><dt>確認間隔</dt><dd id="interval">5分</dd></div>
+    <div><dt>取得済みの更新</dt><dd id="pending">なし</dd></div>
+  </dl>
+  <p class="hint">初回はこの拡張機能のフォルダを登録してください。自動更新中は Releases の latest を定期確認し、署名・ハッシュを確認した active.js だけを置換します。</p>
+  <div class="actions">
+    <button id="register">フォルダを登録・選び直す</button>
+    <button id="grant" disabled>再許可して保留中の更新を適用</button>
+    <button id="enable" disabled>自動更新を開始</button>
+    <button id="disable">自動更新を停止</button>
+    <button id="check">今すぐ確認</button>
+    <button id="tab">独立タブで開く</button>
+    <button id="recover" hidden>バックアップの active.js に復元</button>
+  </div>
+  <p id="status" role="status" aria-live="polite">起動中…</p>
+  <details><summary>実験ログ</summary><pre id="events"></pre></details>
+</main>
+</body>
+</html>

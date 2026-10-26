@@ -1,0 +1,15 @@
+{
+  "manifest_version": 3,
+  "name": "GitHub 自己更新実験",
+  "version": "0.1.0",
+  "description": "GitHub Releases の署名付き ZIP を定期確認し、選択フォルダの active.js だけを更新する実験用拡張。",
+  "permissions": ["alarms"],
+  "host_permissions": [
+    "https://api.github.com/*",
+    "https://github.com/*",
+    "https://release-assets.githubusercontent.com/*"
+  ],
+  "background": { "service_worker": "worker.js", "type": "module" },
+  "action": { "default_title": "GitHub 自己更新実験", "default_popup": "popup.html" },
+  "content_security_policy": { "extension_pages": "script-src 'self'; object-src 'none'; base-uri 'none'" }
+}
