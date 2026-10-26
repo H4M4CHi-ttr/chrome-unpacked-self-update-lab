@@ -1,0 +1,30 @@
+✔ a signed manifest and ZIP yield the exact active.js bytes (6.5406ms)
+✔ rejects changed manifest bytes before using paths or sizes (1.3129ms)
+✔ rejects signatures from another key (0.9914ms)
+✔ rejects a malformed signature (0.6298ms)
+✔ rejects a valid signature carrying another repository (0.781ms)
+✔ rejects a valid signature carrying wrong version (0.7854ms)
+✔ rejects a valid signature carrying wrong tag (0.7195ms)
+✔ rejects a valid signature carrying path traversal (1.9184ms)
+✔ rejects a valid signature carrying oversized code (1.0141ms)
+✔ rejects ZIP bytes that differ from the signed digest (0.6845ms)
+✔ rejects files beyond active.js even inside a correctly signed ZIP (0.6233ms)
+✔ rejects an unzipped payload with the wrong code digest (0.5375ms)
+✔ version comparison is numeric and rejects non-normal releases (0.3596ms)
+✔ updates only active.js and waits for durable backup before writing (1.3408ms)
+✔ rejects a same-content copy when Chrome's own URL does not reflect the write (0.5336ms)
+✔ rejects an incorrect identity without writing (0.1682ms)
+✔ rejects permissions that need user action before touching files (0.1109ms)
+✔ preserves a user edit instead of overwriting it (0.1351ms)
+✔ restores original source on a close failure (0.7852ms)
+✔ reports a failed rollback while the durable backup remains available (1.6019ms)
+✔ restores the file if saving the update receipt fails (0.4769ms)
+✔ limits streamed downloads and records rate-limit retry time (13.2752ms)
+ℹ tests 22
+ℹ suites 0
+ℹ pass 22
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 171.9624
