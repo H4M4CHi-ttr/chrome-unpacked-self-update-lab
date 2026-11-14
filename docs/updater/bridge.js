@@ -18,7 +18,8 @@ export function isValidMessage(message) {
   if (message.action === "permission") return ["granted", "prompt", "denied", "not-selected"].includes(message.permission);
   if (message.action === "attention") return ["folder", "recovery"].includes(message.cause);
   if (message.action === "begin") return isToken(message.token) && isHash(message.beforeHash) && isHash(message.targetHash);
-  return ["commit", "cancel"].includes(message.action) && isToken(message.token);
+  if (message.action === "cancel") return isToken(message.token) && (message.pause === undefined || typeof message.pause === "boolean");
+  return message.action === "commit" && isToken(message.token);
 }
 
 export function updaterURL(id) {

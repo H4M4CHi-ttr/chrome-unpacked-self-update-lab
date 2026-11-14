@@ -130,11 +130,11 @@ async function rollback({ manual = false } = {}) {
     throw namedError("RecoveryError", "他の更新が進行中のため復元できません。");
   }
   await restoreRecovery(recovery);
-  await rpc("cancel", { token: recovery.token });
-  await rpc("unblock");
+  await rpc("cancel", { token: recovery.token, pause: manual });
+  if (!manual) await rpc("unblock");
   await save(key("recovery"), null);
   recovery = null;
-  say("中断前のコードに戻しました。");
+  say(manual ? "中断前のコードに戻し、自動更新を停止しました。" : "中断前のコードに戻しました。");
 }
 
 async function apply(plan) {
