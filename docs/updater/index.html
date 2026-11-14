@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; base-uri 'none'; form-action 'none'">
+  <title>GitHub 自己更新 — フォルダ設定</title>
+  <link rel="stylesheet" href="../isolation/style.css">
+  <script type="module" src="client.js"></script>
+</head>
+<body>
+<main>
+  <header><span>UNPACKED EXTENSION / GITHUB RELEASES</span><h1>GitHub 自己更新</h1></header>
+  <p>このページに、Chrome に読み込んだ拡張機能フォルダの読み書きを許可します。許可するのは実験用のフォルダだけにしてください。</p>
+  <dl>
+    <div><dt>実行中のコード</dt><dd id="version">接続中…</dd></div>
+    <div><dt>フォルダ許可</dt><dd id="permission">確認中…</dd></div>
+    <div><dt>自動更新</dt><dd id="enabled">確認中…</dd></div>
+  </dl>
+  <div class="actions">
+    <button id="pick" disabled>拡張機能フォルダを選ぶ</button>
+    <button id="grant" disabled>保存したフォルダを再許可</button>
+    <button id="enable" disabled>自動更新を有効にする</button>
+    <button id="restore" hidden disabled>中断した更新を旧版に戻す</button>
+  </div>
+  <p id="status" role="status" aria-live="polite">対象の拡張機能に接続しています。</p>
+  <p>Chrome のダイアログに「サイトアクセス時は常に許可」が出る場合は、それを選ぶと許可を次回も使えます。設定後はこのタブを閉じても、必要なときに Chrome が開きます。自動更新の停止は拡張機能のメニューから行えます。</p>
+</main>
+</body>
+</html>
