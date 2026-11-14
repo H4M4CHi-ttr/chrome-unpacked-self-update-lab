@@ -162,6 +162,11 @@ async function apply(plan) {
       catch { await rpc("attention", { cause: "recovery" }); throw error; }
     }
     if (error.rollback === "failed") await rpc("attention", { cause: "recovery" });
+    else if (error.name === "NotAllowedError") {
+      const currentPermission = await directory.queryPermission({ mode: "readwrite" });
+      if (currentPermission === "granted") await rpc("attention", { cause: "folder" });
+      else await rpc("permission", { permission: currentPermission });
+    }
     if (["FolderValidationError", "SourceMismatchError", "NotFoundError"].includes(error.name)) {
       await rpc("attention", { cause: "folder" });
     }
@@ -215,7 +220,7 @@ $("#grant").onclick = () => action(async () => {
 $("#enable").onclick = () => action(() => locked(async () => {
   await rpc("permission", { permission: await directory.queryPermission({ mode: "readwrite" }) });
   await rpc("enable");
-  await sync();
+  say("自動更新を有効にしました。このタブは閉じられます。");
 }));
 $("#restore").onclick = () => action(async () => {
   if (await recovery.directory.requestPermission({ mode: "readwrite" }) !== "granted") throw namedError("NotAllowedError", "復元にも書き込み許可が必要です。");
