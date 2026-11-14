@@ -1,0 +1,114 @@
+{
+  "version": "0.3.0",
+  "enabled": true,
+  "permission": "granted",
+  "transfer": null,
+  "receipt": {
+    "version": "0.1.2",
+    "sha256": "fbc9af35c06aaa7f0c3af88413f2488a0e94357aec1f1a69b43374da12f53a9d",
+    "status": "executed",
+    "writtenAt": "2026-11-14T03:38:22.524Z",
+    "bootId": "1d20e749-d88f-4348-b822-0be47b4c9545",
+    "observedAt": "2026-11-14T03:38:23.171Z"
+  },
+  "status": {
+    "at": "2026-11-14T03:38:23.173Z",
+    "phase": "updated",
+    "executingVersion": "0.1.2"
+  },
+  "badge": "",
+  "candidate": null,
+  "tabs": [
+    {
+      "id": 452517766,
+      "active": false,
+      "status": "complete"
+    }
+  ],
+  "events": [
+    {
+      "at": "2026-11-14T03:34:46.602Z",
+      "phase": "worker-started",
+      "version": "0.1.0",
+      "bootId": "935f92cc-bae1-4c50-aac8-ce2174674657"
+    },
+    {
+      "at": "2026-11-14T03:34:46.604Z",
+      "phase": "ready",
+      "executingVersion": "0.1.0"
+    },
+    {
+      "at": "2026-11-14T03:35:04.199Z",
+      "phase": "permission-required",
+      "executingVersion": "0.1.0",
+      "permission": "not-selected"
+    },
+    {
+      "at": "2026-11-14T03:36:36.953Z",
+      "phase": "ready",
+      "executingVersion": "0.1.0"
+    },
+    {
+      "at": "2026-11-14T03:36:36.957Z",
+      "phase": "monitoring",
+      "executingVersion": "0.1.0"
+    },
+    {
+      "at": "2026-11-14T03:37:51.372Z",
+      "phase": "worker-started",
+      "version": "0.1.0",
+      "bootId": "756c6440-fb3c-4384-9772-3cefd61fa145"
+    },
+    {
+      "at": "2026-11-14T03:38:21.71Z",
+      "phase": "release-checked",
+      "reason": "alarm",
+      "latest": "0.1.2"
+    },
+    {
+      "at": "2026-11-14T03:38:21.968Z",
+      "phase": "downloaded-verified-unpacked",
+      "reason": "alarm",
+      "targetVersion": "0.1.2",
+      "sha256": "fbc9af35c06aaa7f0c3af88413f2488a0e94357aec1f1a69b43374da12f53a9d"
+    },
+    {
+      "at": "2026-11-14T03:38:21.97Z",
+      "phase": "awaiting-updater",
+      "executingVersion": "0.1.0",
+      "reason": "alarm",
+      "targetVersion": "0.1.2"
+    },
+    {
+      "at": "2026-11-14T03:38:21.99Z",
+      "phase": "updater-opened",
+      "tabId": 452517766,
+      "requestedActive": false
+    },
+    {
+      "at": "2026-11-14T03:38:22.526Z",
+      "phase": "reloading",
+      "executingVersion": "0.1.0",
+      "targetVersion": "0.1.2",
+      "tabId": 452517766
+    },
+    {
+      "at": "2026-11-14T03:38:23.172Z",
+      "phase": "execution-confirmed",
+      "version": "0.1.2",
+      "sha256": "fbc9af35c06aaa7f0c3af88413f2488a0e94357aec1f1a69b43374da12f53a9d",
+      "bootId": "1d20e749-d88f-4348-b822-0be47b4c9545"
+    },
+    {
+      "at": "2026-11-14T03:38:23.172Z",
+      "phase": "worker-started",
+      "version": "0.1.2",
+      "bootId": "1d20e749-d88f-4348-b822-0be47b4c9545"
+    },
+    {
+      "at": "2026-11-14T03:38:23.174Z",
+      "phase": "updated",
+      "executingVersion": "0.1.2"
+    }
+  ]
+}

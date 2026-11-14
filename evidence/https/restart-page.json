@@ -1,0 +1,13 @@
+{
+  "documentId": "85e829b7-e892-4c27-bffe-3b7ca6da61c5",
+  "updateVisibility": "visible",
+  "updateActivation": "false",
+  "beforePermission": "granted",
+  "beforeBootId": "756c6440-fb3c-4384-9772-3cefd61fa145",
+  "outcome": "updated",
+  "permission": "granted",
+  "version": "v0.1.2",
+  "result": "v0.1.2 の起動を確認しました。",
+  "currentPermission": "granted",
+  "backupReleased": true
+}

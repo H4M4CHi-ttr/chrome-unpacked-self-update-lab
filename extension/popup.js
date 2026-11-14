@@ -1,98 +1,58 @@
-import { loadBundle, restoreRecovery, validateDirectory } from "./core.js";
-import { load, readEvents, record, save } from "./store.js";
+import { record } from "./store.js";
 
 const $ = (selector) => document.querySelector(selector);
-let directory, recovery;
-let busy = false, ready = false, localError = "";
-if (new URL(location.href).searchParams.has("tab")) document.body.classList.add("tab");
+const labels = {
+  ready: "フォルダを登録すると自動更新を開始できます。",
+  monitoring: "GitHub Releases を定期確認しています。",
+  "up-to-date": "新しいリリースはありません。",
+  downloaded: "検証済みの更新があります。適用するには自動更新を有効にしてください。",
+  "awaiting-updater": "HTTPS 更新ページでの処理を待っています。",
+  "permission-required": "更新ページでフォルダを登録するか、書き込みを再許可してください。",
+  "folder-required": "更新ページで正しい拡張機能フォルダを選び直してください。",
+  "recovery-required": "更新ページで中断した更新を確認してください。",
+  reloading: "書き込みを確認しました。拡張機能を再読み込みしています。",
+  updated: "新しいコードの起動を確認しました。",
+  restored: "前のコードを確認しました。",
+  disabled: "自動更新を停止しました。",
+};
+let busy = false;
 
 async function send(kind) {
   const result = await chrome.runtime.sendMessage({ kind });
-  if (result?.error) throw Object.assign(new Error(result.error.message), { name: result.error.name });
+  if (result?.error) throw new Error(result.error.message);
   return result;
 }
 
 async function refresh() {
-  directory = await load("directory");
-  recovery = await load("recovery");
-  let permission = "未選択";
-  try { if (directory) permission = await directory.queryPermission({ mode: "readwrite" }); }
-  catch (error) { permission = error.name; }
-  $("#permission").textContent = permission;
-  $("#grant").disabled = busy || !directory;
-  $("#enable").disabled = busy || !directory || Boolean(recovery);
-  $("#register").disabled = busy || Boolean(recovery);
-  $("#recover").hidden = !recovery;
-  $("#recover").disabled = busy;
+  const state = await send("status");
+  $("#enabled").textContent = state.enabled ? "有効" : "停止中";
+  $("#interval").textContent = state.alarm?.periodInMinutes ? (state.alarm.periodInMinutes * 60) + " 秒" : "停止中";
+  $("#pending").textContent = state.pending ?? state.transfer?.targetVersion ?? "なし";
+  $("#permission").textContent = { granted: "前回の確認: 許可あり", prompt: "再許可が必要", denied: "拒否", "not-selected": "未登録" }[state.permission] ?? "確認中";
+  $("#disable").disabled = busy || !state.enabled;
   $("#check").disabled = busy;
-  $("#disable").disabled = busy;
-  try {
-    const state = await send("status");
-    $("#enabled").textContent = state.enabled ? "有効" : "停止中";
-    $("#interval").textContent = state.alarm?.periodInMinutes ? `${state.alarm.periodInMinutes * 60} 秒` : "停止中";
-    $("#pending").textContent = state.pending ?? "なし";
-    if (!busy) $("#status").textContent = localError || JSON.stringify(state.status ?? { phase: "ready" }, null, 2);
-    $("#events").textContent = state.events.map((event) => JSON.stringify(event)).join("\n");
-  } catch (error) {
-    $("#status").textContent = localError || `${error.name}: ${error.message}\nバックアップがあれば復元できます。`;
-    $("#events").textContent = (await readEvents()).slice(-50).map((event) => JSON.stringify(event)).join("\n");
-  }
+  $("#updater").disabled = busy;
+  $("#status").textContent = state.status?.phase === "error" ? state.status.message : labels[state.status?.phase] ?? "";
+  $("#events").textContent = state.events.map((event) => JSON.stringify(event)).join("\n");
 }
 
-async function action(task) {
-  if (busy || !ready) return;
-  busy = true;
-  localError = "";
-  for (const button of document.querySelectorAll("button:not(#tab)")) button.disabled = true;
-  try { await task(); }
-  catch (error) {
-    localError = `${error.name}: ${error.message}`;
-    await record({ phase: "ui-error", name: error.name, message: error.message }).catch(() => {});
-  } finally { busy = false; await refresh(); }
+function showError(error) { $("#status").textContent = error.message; }
+for (const kind of ["updater", "disable", "check"]) {
+  $("#" + kind).onclick = async () => {
+    if (busy) return;
+    busy = true;
+    for (const button of document.querySelectorAll("button")) button.disabled = true;
+    try { await send(kind); busy = false; await refresh(); }
+    catch (error) { showError(error); }
+    finally { busy = false; }
+  };
 }
 
-$("#register").onclick = () => action(async () => {
-  const selection = window.showDirectoryPicker({ id: "github-auto-update-lab", mode: "readwrite" });
-  const selected = await selection;
-  await navigator.locks.request("github-unpacked-self-update-lab", async () => {
-    if (await load("recovery")) throw new Error("先にバックアップを復元してください。");
-    await validateDirectory(selected, await loadBundle());
-    await save("directory", selected);
-    await record({ phase: "folder-registered", permission: await selected.queryPermission({ mode: "readwrite" }) });
-  });
-});
-
-$("#grant").onclick = () => action(async () => {
-  const permission = await directory.requestPermission({ mode: "readwrite" });
-  await record({ phase: "permission-click", permission });
-  if (permission !== "granted") throw new Error(`再許可の結果: ${permission}`);
-  await send("apply");
-});
-$("#enable").onclick = () => action(() => send("enable"));
-$("#disable").onclick = () => action(() => send("disable"));
-$("#check").onclick = () => action(() => send("check"));
-$("#tab").onclick = () => chrome.tabs.create({ url: `${chrome.runtime.getURL("popup.html")}?tab=1` });
-$("#recover").onclick = () => action(async () => {
-  const backup = recovery;
-  if (!backup || await backup.directory.requestPermission({ mode: "readwrite" }) !== "granted") throw new Error("バックアップ元の再許可が必要です。");
-  await navigator.locks.request("github-unpacked-self-update-lab", async () => {
-    await restoreRecovery(backup, await loadBundle());
-    await save("receipt", backup.previousReceipt);
-    await save("recovery", null);
-    await record({ phase: "recovered", version: backup.fromVersion });
-    chrome.runtime.reload();
-  });
-});
-
-async function start() {
-  try {
-    const active = await import("./active.js");
-    $("#version").textContent = active.version;
-    const proof = active.runSource($("#demo"));
-    await record({ phase: "ui-executed", version: active.version, source: active.sourceId, proof });
-  } catch (error) { localError = `active.js の実行失敗: ${error.name}: ${error.message}`; }
-  ready = true;
-  await refresh();
-  setInterval(() => { if (!busy) void refresh().catch(() => {}); }, 2000);
-}
-void start().catch((error) => { $("#status").textContent = `${error.name}: ${error.message}`; });
+try {
+  const active = await import("./active.js");
+  $("#version").textContent = active.version;
+  const proof = active.runSource($("#demo"));
+  await record({ phase: "ui-executed", version: active.version, source: active.sourceId, proof });
+} catch (error) { $("#demo h2").textContent = "active.js の実行失敗: " + error.message; }
+await refresh().catch(showError);
+setInterval(() => { if (!busy) void refresh().catch(showError); }, 2000);

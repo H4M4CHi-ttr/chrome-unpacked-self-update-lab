@@ -13,13 +13,21 @@ async function transact(name, mode, action) {
   return new Promise((resolve, reject) => {
     const transaction = db.transaction(name, mode);
     const request = action(transaction.objectStore(name));
-    transaction.oncomplete = () => resolve(request.result);
-    transaction.onabort = () => reject(transaction.error ?? request.error ?? new Error("IndexedDB transaction aborted"));
-    transaction.onerror = () => reject(transaction.error ?? request.error);
+    transaction.oncomplete = () => resolve(request?.result);
+    transaction.onabort = () => reject(transaction.error ?? request?.error ?? new Error("IndexedDB transaction aborted"));
+    transaction.onerror = () => reject(transaction.error ?? request?.error);
   });
 }
 
 export const load = (key) => transact("state", "readonly", (store) => store.get(key));
-export const save = (key, value) => transact("state", "readwrite", (store) => store.put(value, key));
+export const saveAll = (values) => transact("state", "readwrite", (store) => {
+  for (const [key, value] of Object.entries(values)) store.put(value, key);
+  return null;
+});
+export const save = (key, value) => saveAll({ [key]: value });
 export const readEvents = () => transact("events", "readonly", (store) => store.getAll());
-export const record = (event) => transact("events", "readwrite", (store) => store.add({ at: new Date().toISOString(), ...event }));
+export const record = (event) => transact("events", "readwrite", (store) => {
+  const entry = store.add({ at: new Date().toISOString(), ...event });
+  entry.onsuccess = () => { if (entry.result > 100) store.delete(IDBKeyRange.upperBound(entry.result - 100)); };
+  return entry;
+});

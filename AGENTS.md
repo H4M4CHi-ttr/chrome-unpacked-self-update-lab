@@ -1,0 +1,24 @@
+# このリポジトリを変更・移植する AI エージェントへ
+
+これは開発者モードで読み込む Chrome 拡張機能の実装例です。成功はディスクと実行結果で判定します。ディスク上の `active.js` が置き換わり、再読み込み後のサービスワーカーが署名で指定された版を実行したことを確認してください。
+
+## 最初に読むファイル
+
+1. [README](README.md)：インストールと初回許可、期待する動作、検証結果への入口。
+2. [extension/worker.js](extension/worker.js)：アラーム、署名済み候補の保存、タブ起動、外部 RPC、再読み込みの記録。
+3. [docs/updater/client.js](docs/updater/client.js)：ユーザーのフォルダ選択、許可の復元、書き込み、書き込み後の確認。
+4. [extension/release.js](extension/release.js) と [extension/core.js](extension/core.js)：配信物とフォルダの照合、書き込みと復元。
+5. [移植ガイド](PORTING.md)：自分のリポジトリ、HTTPS オリジン、署名鍵に差し替える手順。作業依頼に使えるプロンプトもあります。
+
+## 更新の境界を保つ
+
+- 拡張機能だけが GitHub Releases を読み、固定した公開鍵で update.json の署名を検証します。ZIP のサイズとハッシュ、active.js の名前・サイズ・ハッシュ、対象リポジトリ、タグ、版の単調増加を確認します。
+- HTTPS ページはブラウザでユーザーが選んだハンドルを、そのサイトの IndexedDB に拡張機能 ID ごとに保存します。ハンドルや OS パスをメッセージで渡さないでください。権限のないときは更新を停止し、ユーザー操作のボタンからだけ権限を求めます。
+- 外部メッセージを受ける条件は manifest の externally_connectable と bridge.js の正確なオリジン・パス・トップフレーム・対象 ID です。書き込み先を RPC や ZIP から指定させないでください。
+- 書き込み前に旧バイト列を HTTPS 側へ、トランザクション識別子を拡張側へ保存します。両側の許可された状態が一致してから置換し、Chrome の読み込み元にも反映されたことを照合して reload します。新版を実行した記録が取れるまでは復元用データを残します。
+- extension/bridge.js、core.js、store.js を変更したら、node tools/sync-updater.mjs で docs/updater の配信用コピーを更新してください。比較実験の docs/isolation は別の実装です。
+- 実際のフォルダを壊さないよう、検証は一時 Chrome プロファイルと配布物のコピーで行います。公開リリースや Pages は、変更が明示的に依頼されたときにだけ更新してください。
+
+## 完了判定
+
+node --test tests/*.test.mjs と node tools/sync-updater.mjs --check を実行してください。実機では、更新ページを閉じた状態からの自動起動、選択中のタブを切り替えないこと、既存タブの再利用、Chrome の完全再起動後、許可の取り消し、異なるフォルダを試します。開始時と終了時に active.js の SHA-256、実行版、サービスワーカーの起動 ID を記録してください。再現していない挙動は未検証と明記します。

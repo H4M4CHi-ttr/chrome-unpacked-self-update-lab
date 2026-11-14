@@ -1,0 +1,1 @@
+{"isTestOnly":true,"begin":{"error":{"name":"UpdateChangedError","message":"更新候補または設定が変わりました。次の確認で再試行します。"}},"commit":{"error":{"name":"FolderValidationError","message":"Chrome の読み込み元に書き換えが反映されていません。"}},"hash":"cd801c200d2d0ddc0808b1bfd1045adebd20fd4c6b557c063f2835f21e62017f","unchangedBoot":true,"unchangedVersion":true,"version":"0.1.0"}
