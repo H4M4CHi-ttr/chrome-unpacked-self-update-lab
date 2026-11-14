@@ -1,0 +1,57 @@
+name: Hourly demo release
+
+on:
+  # This schedule exists only to generate updates for this lab. Omit it when porting the updater.
+  schedule:
+    - cron: "17 * * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: hourly-demo-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    if: github.repository == 'H4M4CHi-ttr/chrome-unpacked-self-update-lab' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+          package-manager-cache: false
+      - name: Verify updater
+        run: |
+          node --test tests/*.test.mjs
+          node tools/sync-updater.mjs --check
+      - name: Calculate next version from the latest published release
+        id: version
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          latest="$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq .tag_name)"
+          tag="$(node tools/build-release.mjs --next "$latest")"
+          printf 'tag=%s\n' "$tag" >> "$GITHUB_OUTPUT"
+      - name: Build and verify signed release assets
+        env:
+          DEMO_SIGNING_KEY_PEM: ${{ secrets.DEMO_SIGNING_KEY_PEM }}
+          TAG: ${{ steps.version.outputs.tag }}
+        run: node tools/build-release.mjs "${TAG#v}" "$RUNNER_TEMP/demo-release"
+      - name: Publish the scheduled demo release
+        if: github.event_name == 'schedule'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          gh release create "$TAG" \
+            "$RUNNER_TEMP/demo-release/auto-update-https.zip" "$RUNNER_TEMP/demo-release/update.zip" \
+            "$RUNNER_TEMP/demo-release/update.json" "$RUNNER_TEMP/demo-release/update.sig" \
+            --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "$TAG" --latest \
+            --notes "自動更新を試すための定期リリースです。マイナー版を1つ上げています。署名付きの active.js 更新と、新規インストール用 ZIP を同梱します。"

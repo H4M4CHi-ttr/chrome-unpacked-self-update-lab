@@ -1,4 +1,4 @@
-export const version = "0.1.0";
+export const version = "1.0.0";
 export const sourceId = "A";
 export const implementationName = "runSourceA";
 function runSourceA() { return `A 専用関数: 6 × 7 = ${6 * 7}`; }

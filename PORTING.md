@@ -28,20 +28,24 @@ Chrome の開発者モードで配布する拡張機能を対象に、初回の�
 ~~~powershell
 # 保存先は公開リポジトリ外の、自分だけが読める既存ディレクトリ
 openssl genpkey -algorithm EC -pkeyopt ec_paramgen_curve:prime256v1 -out <秘密ディレクトリ>/updates.pem
-node tools/create-update.mjs 0.1.0 extension/active.js <秘密ディレクトリ>/updates.pem <空きパス>/seed
+node tools/create-update.mjs 1.0.0 extension/active.js <秘密ディレクトリ>/updates.pem <空きパス>/seed
 ~~~
 
 初回配布にだけ、生成された trust.json と install.json を extension にコピーします。active.js と残りの拡張ファイルをまとめて配布します。次のリリースでは、版を上げた active.js を別の作業場所で作り、同じ鍵で署名します。
 
 ~~~powershell
-node tools/create-update.mjs 0.1.1 <新しいソース>/active.js <秘密ディレクトリ>/updates.pem <空きパス>/v0.1.1
-gh release create v0.1.1 <空きパス>/v0.1.1/update.json <空きパス>/v0.1.1/update.sig <空きパス>/v0.1.1/update.zip --latest
+node tools/create-update.mjs 1.1.0 <新しいソース>/active.js <秘密ディレクトリ>/updates.pem <空きパス>/v1.1.0
+gh release create v1.1.0 <空きパス>/v1.1.0/update.json <空きパス>/v1.1.0/update.sig <空きパス>/v1.1.0/update.zip --latest
 ~~~
 
-上のコマンドの <> 部分は実際のパスに置き換えてください。アセットをそろえてから通常リリースとして公開します。下書きとプレリリースは latest の対象外です。秘密鍵をコミット、アップロード、エージェントの出力への貼り付けに使わないでください。公開済みのこのデモ用の秘密鍵は廃棄済みです。自分で配信を続ける場合は、自分の鍵を固定した初期版から始めます。鍵を更新する仕組みはこの実装にありません。
+上のコマンドの <> 部分は実際のパスに置き換えてください。アセットをそろえてから通常リリースとして公開します。下書きとプレリリースは latest の対象外です。秘密鍵は配信者が管理し、コミットや公開アセット、エージェントの出力に含めないでください。自分の拡張機能は、自分の公開鍵を固定した初期版から始めます。鍵を切り替えるときは、新しい公開鍵を同梱した ZIP を再配布します。
+
+## cron はデモ専用。移植先は公開する版を明示する
+
+このリポジトリの毎時の GitHub Actions は、実験用の版を作り続けるためにあります。AI エージェントはこの cron や自動の版上げを移植しないでください。運用先では、レビュー済みのタグを作るときや明示的な公開操作を起点に、署名と配信を実行します。拡張機能が Releases を定期確認する処理は移植できます。
 
 ## AI エージェントへ渡す依頼の例
 
-> このリポジトリの AGENTS.md と PORTING.md を読み、開発者モードで読み込む私の拡張機能に自動更新を追加してください。まず更新可能なコードを1ファイルに分け、既存機能と権限を調べてください。GitHub の新しい通常リリースを署名検証し、初回に私が許可した専用 HTTPS ページから書き換え、実際の新版起動をハッシュと実行結果で確認できるようにしてください。リリース先、更新ページの専用オリジン、許可するファイルは明示し、権限がない場合は書かずに待ってください。秘密鍵を表示せず、公開作業は別途指示があるまで行わないでください。未検証の条件も報告してください。
+> このリポジトリの AGENTS.md と PORTING.md を読み、開発者モードで読み込む私の拡張機能に自動更新を追加してください。まず更新可能なコードを1ファイルに分け、既存機能と権限を調べてください。GitHub の新しい通常リリースを署名検証し、初回に私が許可した専用 HTTPS ページから書き換え、実際の新版起動をハッシュと実行結果で確認できるようにしてください。リリース先、更新ページの専用オリジン、許可するファイルは明示し、権限がない場合は書かずに待ってください。毎時リリースの cron は移植せず、既存の公開手順を使ってください。秘密鍵を表示せず、公開作業は別途指示があるまで行わないでください。未検証の条件も報告してください。
 
 追加の確認先: [Chrome の永続的なファイル権限](https://developer.chrome.com/blog/persistent-permissions-for-the-file-system-access-api)、[外部ページからのメッセージ](https://developer.chrome.com/docs/extensions/develop/concepts/messaging#external-webpage)、[GitHub Releases API](https://docs.github.com/en/rest/releases/releases#get-the-latest-release)。

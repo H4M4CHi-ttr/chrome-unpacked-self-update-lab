@@ -6,13 +6,19 @@
 
 ## デモを試す：許可と有効化は初回だけ
 
-1. [実験用 ZIP（HTTPS 自動更新版）](https://github.com/H4M4CHi-ttr/chrome-unpacked-self-update-lab/releases/download/v0.1.2/auto-update-https.zip) をダウンロードし、新しいフォルダに展開します。旧実験版や編集中のフォルダには上書きしないでください。
-2. Chrome の chrome://extensions で開発者モードをオンにし、「パッケージ化されていない拡張機能を読み込む」から展開した extension フォルダを選びます。ツールバーの「GitHub 自己更新実験」を開き、コード版が 0.1.0 であることを確認します。
+1. [v1.0.0 の実験用 ZIP](https://github.com/H4M4CHi-ttr/chrome-unpacked-self-update-lab/releases/download/v1.0.0/auto-update-https.zip) をダウンロードし、新しいフォルダに展開します。v0.x から試し直す場合も、この ZIP から始めてください。v1.0.0 で配信の署名鍵を切り替えました。
+2. Chrome の chrome://extensions で開発者モードをオンにし、「パッケージ化されていない拡張機能を読み込む」から展開した extension フォルダを選びます。ツールバーの「GitHub 自己更新実験」を開き、コード版が 1.0.0 であることを確認します。
 3. 「HTTPS 更新ページを開く」から「拡張機能フォルダを選ぶ」を押し、手順2で読み込んだ **同じ extension フォルダ** を選んで読み書きを許可します。Chrome が「サイトアクセス時は常に許可」を提示したら選びます。最初にその選択肢が出ない場合は、いったんタブを閉じて、次回の「保存したフォルダを再許可」で選べるか確認します。選択肢が出なくても、そのセッションで許可が有効な間は動作します。
 4. 「自動更新を有効にする」を押し、設定ページを閉じます。最初の確認は約30秒後で、その後は5分おきに確認します。すぐ試す場合は、拡張機能の「今すぐ確認」を押してください。
-5. [公開済みの latest](https://github.com/H4M4CHi-ttr/chrome-unpacked-self-update-lab/releases/latest) は v0.1.2 です。拡張機能の「実行中のコード版」が 0.1.2 になり、実験ログに `execution-confirmed` が出れば成功です。ディスク上の `active.js` の SHA-256 は `fbc9af35c06aaa7f0c3af88413f2488a0e94357aec1f1a69b43374da12f53a9d` です。
+5. [最新リリース](https://github.com/H4M4CHi-ttr/chrome-unpacked-self-update-lab/releases/latest) が v1.0.0 より新しくなったら、拡張機能の「実行中のコード版」と実験ログの `execution-confirmed` を確認します。ディスク上の `active.js` の SHA-256 は、適用したリリースの `update.json` の `file.sha256` と一致します。
 
 拡張機能から OS 上のフォルダを自動で取得できないため、手順3のフォルダ選択は必要です。選択したフォルダ全体に対する許可を Chrome がサイトに付与します。この公開デモには実験用のコピーだけを許可してください。ブラウザで別プロファイルを使う場合は、拡張機能の読み込みからフォルダ許可まで同じプロファイルで行います。
+
+## 毎時17分にデモ用のマイナー版を公開する
+
+このリポジトリの GitHub Actions が、公開済みの最新版から v1.1.0、v1.2.0 のようにマイナー版を1ずつ増やします。各版には署名付き更新と新規インストール用 ZIP が付きます。デモのコード版だけを進めるため、更新確認を繰り返し試せます。GitHub の混雑時には実行が遅れたり、見送られたりする場合があります。必要に応じて Actions 画面の「Hourly demo release」から停止できます。[ワークフロー](.github/workflows/hourly-demo-release.yml) · [GitHub のスケジュール仕様](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#schedule)
+
+移植時は毎時の cron をコピーせず、自分のプロジェクトのリリース時に署名済みの配信物を用意してください。Chrome 拡張機能が5分おきに Releases を確認する処理とは別の設定です。[移植ガイド](PORTING.md)
 
 ## 新版があるときだけ更新タブを開く
 
