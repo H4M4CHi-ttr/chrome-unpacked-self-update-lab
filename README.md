@@ -14,13 +14,13 @@
 
 拡張機能から OS 上のフォルダを自動で取得できないため、手順3のフォルダ選択は必要です。選択したフォルダ全体に対する許可を Chrome がサイトに付与します。この公開デモには実験用のコピーだけを許可してください。ブラウザで別プロファイルを使う場合は、拡張機能の読み込みからフォルダ許可まで同じプロファイルで行います。
 
-## 毎時17分にデモ用のマイナー版を公開する
+## 毎時3回確認し、公開間隔を60分以上空ける
 
-このリポジトリの GitHub Actions が、公開済みの最新版から v1.1.0、v1.2.0 のようにマイナー版を1ずつ増やします。各版には署名付き更新と新規インストール用 ZIP が付きます。デモのコード版だけを進めるため、更新確認を繰り返し試せます。GitHub の混雑時には実行が遅れたり、見送られたりする場合があります。必要に応じて Actions 画面の「Hourly demo release」から停止できます。[ワークフロー](.github/workflows/hourly-demo-release.yml) · [GitHub のスケジュール仕様](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#schedule)
+GitHub Actions は毎時17分・37分・57分に起動を試します。最新版の公開から60分以上経っていれば、マイナー版を1つ上げて署名付き更新と新規インストール用 ZIP を公開します。60分未満ならビルド前に終了します。起動枠を増やすと取りこぼしを補えますが、GitHub の混雑時には実行が遅れたり、見送られたりする場合があります。停止するには Actions 画面で「Hourly demo release」を無効にします。[ワークフロー](.github/workflows/hourly-demo-release.yml) · [GitHub のスケジュール仕様](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#schedule)
 
 移植時は毎時の cron をコピーせず、自分のプロジェクトのリリース時に署名済みの配信物を用意してください。Chrome 拡張機能が5分おきに Releases を確認する処理とは別の設定です。[移植ガイド](PORTING.md)
 
-メンテナーが Actions の「Run workflow」を押すと、次版のビルドと署名を確認できます。「Publish the next demo version」を選んだときは、その場で次版を公開します。
+メンテナーが Actions の「Run workflow」を押すと、次版のビルドと署名を確認できます。「Publish if at least 60 minutes have passed」を選ぶと、定期実行と同じ条件で次版を公開します。
 
 ## 新版があるときだけ更新タブを開く
 

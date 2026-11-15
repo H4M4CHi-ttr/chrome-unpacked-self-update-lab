@@ -3,11 +3,11 @@ name: Hourly demo release
 on:
   # This schedule exists only to generate updates for this lab. Omit it when porting the updater.
   schedule:
-    - cron: "17 * * * *"
+    - cron: "17,37,57 * * * *"
   workflow_dispatch:
     inputs:
       publish:
-        description: "Publish the next demo version (unchecked only verifies the assets)"
+        description: "Publish if at least 60 minutes have passed (unchecked only verifies assets)"
         type: boolean
         default: false
 
@@ -25,40 +25,69 @@ jobs:
     permissions:
       contents: write
     steps:
+      - name: Check time since the last release
+        id: cadence
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PUBLISH_REQUESTED: ${{ github.event_name == 'schedule' || inputs.publish == true }}
+        run: |
+          release="$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq '[.tag_name, .published_at] | @tsv')"
+          IFS=$'\t' read -r latest published_at <<< "$release"
+          if [[ -z "$latest" || -z "$published_at" ]]; then
+            echo "The latest release must have a tag and a publication time." >&2
+            exit 1
+          fi
+          published_epoch="$(date -u -d "$published_at" +%s)"
+          now="$(date -u +%s)"
+          if [[ "$PUBLISH_REQUESTED" == "true" ]] && (( now - published_epoch < 3600 )); then
+            echo "The latest release ($latest) was published less than 60 minutes ago. Skipping build and publish."
+            exit 0
+          fi
+          printf 'latest=%s\n' "$latest" >> "$GITHUB_OUTPUT"
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: steps.cadence.outputs.latest != ''
         with:
           persist-credentials: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        if: steps.cadence.outputs.latest != ''
         with:
           node-version: "24"
           package-manager-cache: false
       - name: Verify updater
+        if: steps.cadence.outputs.latest != ''
         run: |
           node --test tests/*.test.mjs
           node tools/sync-updater.mjs --check
       - name: Calculate next version from the latest published release
         id: version
+        if: steps.cadence.outputs.latest != ''
         env:
-          GH_TOKEN: ${{ github.token }}
+          LATEST: ${{ steps.cadence.outputs.latest }}
         run: |
-          latest="$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq .tag_name)"
-          tag="$(node tools/build-release.mjs --next "$latest")"
+          tag="$(node tools/build-release.mjs --next "$LATEST")"
           printf 'tag=%s\n' "$tag" >> "$GITHUB_OUTPUT"
       - name: Build and verify signed release assets
+        if: steps.cadence.outputs.latest != ''
         env:
           DEMO_SIGNING_KEY_PEM: ${{ secrets.DEMO_SIGNING_KEY_PEM }}
           TAG: ${{ steps.version.outputs.tag }}
         run: node tools/build-release.mjs "${TAG#v}" "$RUNNER_TEMP/demo-release"
       - name: Publish the demo release
-        if: github.event_name == 'schedule' || inputs.publish == true
+        if: steps.version.outputs.tag != '' && (github.event_name == 'schedule' || inputs.publish == true)
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ steps.version.outputs.tag }}
+          EXPECTED_LATEST: ${{ steps.cadence.outputs.latest }}
         run: |
           head="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq .object.sha)"
           if [[ "$head" != "$GITHUB_SHA" ]]; then
             echo "main changed after checkout. Run again from the current main."
             exit 1
+          fi
+          latest="$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq .tag_name)"
+          if [[ "$latest" != "$EXPECTED_LATEST" ]]; then
+            echo "A different release is now latest. The next run will check the interval again."
+            exit 0
           fi
           gh release create "$TAG" \
             "$RUNNER_TEMP/demo-release/auto-update-https.zip" "$RUNNER_TEMP/demo-release/update.zip" \
