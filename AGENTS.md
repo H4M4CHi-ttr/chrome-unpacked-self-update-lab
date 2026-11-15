@@ -4,7 +4,7 @@
 
 ## 最初に読むファイル
 
-1. [README](README.md)：インストールと初回許可、期待する動作、検証結果への入口。
+1. [日本語 README](README.ja.MD)：インストールと初回許可、期待する動作、検証結果への入口。
 2. [extension/worker.js](extension/worker.js)：アラーム、署名済み候補の保存、タブ起動、外部 RPC、再読み込みの記録。
 3. [docs/updater/client.js](docs/updater/client.js)：ユーザーのフォルダ選択、許可の復元、書き込み、書き込み後の確認。
 4. [extension/release.js](extension/release.js) と [extension/core.js](extension/core.js)：配信物とフォルダの照合、書き込みと復元。

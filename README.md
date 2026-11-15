@@ -1,58 +1,66 @@
-# Chrome 開発者モード向け GitHub Releases 自動更新
+# Automatic updates for unpacked Chrome extensions via GitHub Releases
 
-**初回にフォルダを選んで許可すると、Chrome を開いている間は GitHub Releases の新版を検出し、実際の JavaScript を無操作で更新できる実装例です。** Manifest V3 のパッケージ化されていない拡張機能向けです。Chrome ウェブストア、Native Messaging、実行時の外部プログラムは使いません。
+English · [日本語](README.ja.MD)
 
-設定する方は下の「デモを試す」を読んでください。自分の拡張機能へ組み込む方は [移植ガイド](PORTING.md)、AI エージェントは [AGENTS.md](AGENTS.md) から始められます。
+This project demonstrates how an unpacked Manifest V3 Chrome extension can update itself from GitHub Releases. Load the extension in Developer mode, choose its folder, grant read and write access, and enable automatic updates. While Chrome is running, the extension checks for new releases and can update the JavaScript file on disk automatically as long as write access remains granted. The demo runs without the Chrome Web Store, Native Messaging, or an external program.
 
-## デモを試す：許可と有効化は初回だけ
+Follow the [demo setup](#try-the-demo) to get started. To adapt the updater to your own extension, see the [porting guide](PORTING.md). AI agents can start with [AGENTS.md](AGENTS.md). Both documents are in Japanese.
 
-1. [v1.0.0 の実験用 ZIP](https://github.com/H4M4CHi-ttr/chrome-unpacked-self-update-lab/releases/download/v1.0.0/auto-update-https.zip) をダウンロードし、新しいフォルダに展開します。v0.x から試し直す場合も、この ZIP から始めてください。v1.0.0 で配信の署名鍵を切り替えました。
-2. Chrome の chrome://extensions で開発者モードをオンにし、「パッケージ化されていない拡張機能を読み込む」から展開した extension フォルダを選びます。ツールバーの「GitHub 自己更新実験」を開き、コード版が 1.0.0 であることを確認します。
-3. 「HTTPS 更新ページを開く」から「拡張機能フォルダを選ぶ」を押し、手順2で読み込んだ **同じ extension フォルダ** を選んで読み書きを許可します。Chrome が「サイトアクセス時は常に許可」を提示したら選びます。最初にその選択肢が出ない場合は、いったんタブを閉じて、次回の「保存したフォルダを再許可」で選べるか確認します。選択肢が出なくても、そのセッションで許可が有効な間は動作します。
-4. 「自動更新を有効にする」を押し、設定ページを閉じます。最初の確認は約30秒後で、その後は5分おきに確認します。すぐ試す場合は、拡張機能の「今すぐ確認」を押してください。
-5. [最新リリース](https://github.com/H4M4CHi-ttr/chrome-unpacked-self-update-lab/releases/latest) が v1.0.0 より新しくなったら、拡張機能の「実行中のコード版」と実験ログの `execution-confirmed` を確認します。ディスク上の `active.js` の SHA-256 は、適用したリリースの `update.json` の `file.sha256` と一致します。
+## Try the demo
 
-拡張機能から OS 上のフォルダを自動で取得できないため、手順3のフォルダ選択は必要です。選択したフォルダ全体に対する許可を Chrome がサイトに付与します。この公開デモには実験用のコピーだけを許可してください。ブラウザで別プロファイルを使う場合は、拡張機能の読み込みからフォルダ許可まで同じプロファイルで行います。
+1. Download the [v1.0.0 demo ZIP](https://github.com/H4M4CHi-ttr/chrome-unpacked-self-update-lab/releases/download/v1.0.0/auto-update-https.zip) and extract it to a new folder. Start with this ZIP if you are coming from v0.x. The release signing key changed in v1.0.0.
+2. Open `chrome://extensions` and turn on **Developer mode**. Click **Load unpacked** and select the extracted `extension` folder. Open **GitHub 自己更新実験** from the toolbar and check that the running code version (実行中のコード版) is 1.0.0.
+3. In the extension, click **Open HTTPS updater** (HTTPS 更新ページを開く). On that page, click **Choose extension folder** (拡張機能フォルダを選ぶ), select the **same `extension` folder** you loaded in step 2, and grant read and write access. If Chrome offers **Allow on every visit** (サイトアクセス時は常に許可), select it. If it does not appear on the first visit, close and reopen the updater tab, then click **Reauthorize saved folder** (保存したフォルダを再許可) to see whether the option is available. Automatic updates can still run during the current session while Chrome allows writes.
+4. Click **Enable automatic updates** (自動更新を有効にする) and close the setup page. The first check is scheduled about 30 seconds later. The extension then checks every five minutes. To check immediately, click **Check now** (今すぐ確認) in the extension.
+5. Once the [latest release](https://github.com/H4M4CHi-ttr/chrome-unpacked-self-update-lab/releases/latest) is newer than v1.0.0, confirm that the running code version has changed and the experiment log (実験ログ) contains `execution-confirmed`. The SHA-256 of `active.js` on disk should match `file.sha256` in the applied release's `update.json`.
 
-## 毎時3回確認し、公開間隔を60分以上空ける
+The extension cannot discover its folder on disk automatically, so you need to select it in step 3. Chrome grants the updater site access to the entire folder you choose. Grant this public demo access only to a test copy. If you use a separate Chrome profile, load the extension and grant folder access in that same profile.
 
-GitHub Actions は毎時17分・37分・57分に起動を試します。最新版の公開から60分以上経っていれば、マイナー版を1つ上げて署名付き更新と新規インストール用 ZIP を公開します。60分未満ならビルド前に終了します。起動枠を増やすと取りこぼしを補えますが、GitHub の混雑時には実行が遅れたり、見送られたりする場合があります。停止するには Actions 画面で「Hourly demo release」を無効にします。[ワークフロー](.github/workflows/hourly-demo-release.yml) · [GitHub のスケジュール仕様](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#schedule)
+## Demo release schedule
 
-移植時は毎時の cron をコピーせず、自分のプロジェクトのリリース時に署名済みの配信物を用意してください。Chrome 拡張機能が5分おきに Releases を確認する処理とは別の設定です。[移植ガイド](PORTING.md)
+The GitHub Actions workflow is scheduled at 17, 37, and 57 minutes past each hour. If at least 60 minutes have passed since the latest release was published, the workflow increments the minor version by one and publishes a signed update and a ZIP for fresh installs. If less time has passed, the run exits before building.
 
-メンテナーが Actions の「Run workflow」を押すと、次版のビルドと署名を確認できます。「Publish if at least 60 minutes have passed」を選ぶと、定期実行と同じ条件で次版を公開します。
+The extra slots give the workflow another chance to run if a scheduled run is skipped. GitHub can delay or skip runs during periods of high load. To stop scheduled releases, disable **Hourly demo release** in the Actions tab. [Workflow](.github/workflows/hourly-demo-release.yml) · [GitHub schedule documentation](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#schedule)
 
-## 新版があるときだけ更新タブを開く
+When porting this updater, leave out the demo's cron schedule and prepare signed artifacts as part of your own release process. The extension checks for releases every five minutes using a Chrome alarm. [Porting guide](PORTING.md)
 
-1. 拡張機能のサービスワーカーが latest を確認します。署名を検証し、ZIP から指定の active.js だけを取り出します。
-2. 検証済みの新版があり自動更新が有効なら、同じ拡張機能 ID の HTTPS タブを背面で開きます。すでに対応するタブがあれば、選択中のタブを切り替えずに更新ページを再利用します。
-3. 更新ページは IndexedDB から選択済みフォルダを復元します。許可が有効なら旧ソースを保存してから active.js を置き換えます。Chrome に読み込まれたファイルも照合し、対象拡張機能だけを再読み込みします。
-4. 新しいサービスワーカーが署名で指定された版とハッシュを確認します。その記録が取れた時点でバックアップを解放します。
+Maintainers can use **Run workflow** to build and verify the next version's signed artifacts. Select **Publish if at least 60 minutes have passed** to publish the next version under the same timing rule as scheduled runs.
 
-Chrome を閉じている間は動きません。自動更新を有効にした状態で Chrome を再起動すると、アラームを確保し、その場でもリリースを確認します。スリープ中に Chrome が端末を起こしたり、毎回正確な時刻に実行したりはしません。[Chrome alarms の仕様](https://developer.chrome.com/docs/extensions/reference/api/alarms) を参照してください。
+## How updates work
 
-## 「!」が出たら更新ページで理由を確認する
+1. The extension's service worker checks the `latest` GitHub release, verifies the signature, and extracts only the specified `active.js` from the ZIP.
+2. If automatic updates are enabled and a verified newer version is available, the service worker opens the HTTPS updater in a background tab for that extension ID. If a matching tab already exists, it reuses that tab without switching the active tab.
+3. The updater reads the saved folder information from IndexedDB. If write access is granted, it backs up the original source and replaces `active.js`. It verifies that the file Chrome reads has changed and reloads only the target extension.
+4. After the reload, the service worker checks the running version and file hash against the signed values. The updater deletes the backup after it confirms that the check was recorded.
 
-| 表示 | 操作 |
+The extension runs while Chrome is open. If automatic updates are enabled when Chrome restarts, the extension recreates the alarm if needed and checks for releases at startup. Alarms will not wake a sleeping device, and Chrome may run them later than scheduled. [Chrome alarms API](https://developer.chrome.com/docs/extensions/reference/api/alarms)
+
+## Troubleshooting the ! badge
+
+If the extension shows a `!`, open the HTTPS updater to find out what happened.
+
+| Status or action | What to do |
 | --- | --- |
-| 許可が必要 | 拡張機能から HTTPS 更新ページを開き、「保存したフォルダを再許可」。選択済みのフォルダを使います。Chrome が許可を失った場合だけ必要です。 |
-| フォルダを選び直す | Chrome に読み込んだときに指定した、同じ `extension` フォルダを選びます。 |
-| 中断した更新を確認 | HTTPS 更新ページを開くとディスクと記録を照合します。「中断した更新を旧版に戻す」を押すと、旧版に戻して監視を止めます。 |
-| 自動更新を止める | 拡張機能の「自動更新を停止」を押します。すでに始まった書き込みは完了する場合があります。サイトの許可も取り消すには、Chrome のアドレスバーのファイルアクセス設定から削除します。 |
+| Permission required (許可が必要) | Open the HTTPS updater from the extension and click **Reauthorize saved folder** (保存したフォルダを再許可). You only need to do this if access to the folder you chose earlier has been lost. |
+| Choose the folder again (フォルダを選び直す) | Choose the same `extension` folder you loaded in Chrome. |
+| Check an interrupted update (中断した更新を確認) | Open the HTTPS updater to compare the files on disk with the update record. Click **Restore previous version** (中断した更新を旧版に戻す) to restore the previous source and stop checking for updates. |
+| Stop automatic updates (自動更新を止める) | Click **Stop automatic updates** (自動更新を停止) in the extension. A write that has already started may finish. To revoke the site's permission as well, remove it from the file access settings in Chrome's address bar. |
 
-再許可が必要と分かった後は、確認のたびにタブや許可ダイアログを繰り返し開きません。別コピーへの一時的な書き込みは Chrome 側の照合で検出して元に戻します。外部エディタや同期ソフトが並行して編集したファイルは自動で上書き復元しません。復旧に必要なブラウザデータまで消去された場合に備え、元の配布 ZIP は保管してください。
+Once the updater detects that it needs permission again, later checks stop reopening the tab or showing permission dialogs. If it temporarily writes to an identical copy of the extension, it detects the mismatch by checking the file Chrome reads and restores the original contents. Automatic recovery does not overwrite files that an external editor or sync tool changed during the update. Keep the original ZIP in case the browser data needed for recovery is cleared.
 
-## 実装を読む前に、何を実測したかを見る
+## Test results
 
-- [今回の自動連携の実測](HTTPS-RESULTS.md)：アラーム、タブ起動・再利用、実ファイルと新版起動の確認。
-- [拡張機能が直接書き込んだ比較実験](RESULTS.md)：リリースの署名検証は通っても、拡張の再読み込みで許可が prompt に戻った例。
-- [許可の所有者を分離した比較実験](experiments/permission-isolation/RESULTS.md)：ホット更新との比較、HTTPS の許可を選んだ場合の完全再起動後の実測。
+Before reading the implementation, see what each experiment verified. The reports are in Japanese.
 
-この実装の更新先は既存の active.js だけです。manifest、サービスワーカーの更新基盤、複数ファイルの展開や削除は扱いません。署名付きであっても Web Store 用の配信方式としては使わないでください。[Chrome のリモート配信コードの説明](https://developer.chrome.com/docs/extensions/develop/migrate/remote-hosted-code) を参照してください。
+- The HTTPS updater experiment verified alarms, opening and reusing tabs, writing the file on disk, and starting the updated code. [HTTPS updater results](HTTPS-RESULTS.md)
+- In the direct-write experiment, signature verification passed and the folder permission returned to `prompt` after the extension reloaded. [Direct-write experiment](RESULTS.md)
+- The permission isolation experiment recorded what happens after a full Chrome restart when the HTTPS updater has folder access. It also compares this approach with updating the module without reloading the extension. [Permission isolation experiment](experiments/permission-isolation/RESULTS.md)
 
-## 変更したらテストと配信ページの同期を行う
+The updater replaces only the existing `active.js`. Changes to `manifest.json` or the service worker's update logic, extraction of multiple files, and file deletion are outside its scope. Do not use this approach for Chrome Web Store distribution, even with signed releases. [Chrome's guidance on remotely hosted code](https://developer.chrome.com/docs/extensions/develop/migrate/remote-hosted-code)
 
-Node.js 22 以降で、パッケージのインストールなしで実行できます。
+## Tests and updater page sync
+
+Run these commands with Node.js 22 or later. No additional packages are required.
 
 ~~~powershell
 node --test tests/*.test.mjs
@@ -62,6 +70,6 @@ node tools/verify-isolation-evidence.mjs
 node tools/verify-https-evidence.mjs
 ~~~
 
-拡張機能と HTTPS ページで共用するファイルの変更後は `node tools/sync-updater.mjs` を実行します。自分のリポジトリで署名配信を始めるときは [移植ガイド](PORTING.md) の `create-update.mjs` を使います。`build-fixtures.mjs` は別の鍵でデモを作り直す旧実験用です。実行すると初期コードと公開鍵も置き換わるため、既存リリースの検証には使えません。
+Run `node tools/sync-updater.mjs` after changing files shared by the extension and the HTTPS updater. To sign releases in your own repository, use `create-update.mjs` as described in the [porting guide](PORTING.md). The older `build-fixtures.mjs` script rebuilds the demo with a different key. It replaces the initial code and public key, so it cannot be used to verify existing releases.
 
-ZIP 処理に fflate 0.8.3 を同梱しています（[MIT ライセンス](extension/vendor/LICENSE.fflate)）。
+The demo uses the bundled fflate 0.8.3 for ZIP processing. [MIT license](extension/vendor/LICENSE.fflate)
