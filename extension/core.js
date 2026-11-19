@@ -15,19 +15,14 @@ export async function sha256(bytes) {
   return Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", bytes)), (value) => value.toString(16).padStart(2, "0")).join("");
 }
 
-export async function readOwn(filename) {
+export async function readOwn(filename, limit = Infinity) {
   const url = new URL(chrome.runtime.getURL(filename));
   url.searchParams.set("read", crypto.randomUUID());
   const response = await fetch(url, { cache: "no-store" });
   if (!response.ok) throw new Error(`${filename}: HTTP ${response.status}`);
-  return new Uint8Array(await response.arrayBuffer());
-}
-
-export async function loadBundle() {
-  return {
-    files: Object.fromEntries(await Promise.all(IMMUTABLE_FILES.map(async (name) => [name, await sha256(await readOwn(name))]))),
-    sha256: await sha256(await readOwn("active.js")),
-  };
+  const bytes = new Uint8Array(await response.arrayBuffer());
+  if (bytes.length > limit) throw namedError("SourceMismatchError", filename + " がサイズ上限を超えています。");
+  return bytes;
 }
 
 export async function validateDirectory(directory, bundle) {
@@ -46,11 +41,11 @@ export async function validateDirectory(directory, bundle) {
   return directory.getFileHandle("active.js");
 }
 
-async function writeExact(file, bytes) {
+export async function writeExact(file, bytes) {
   const stream = await file.createWritable({ keepExistingData: false });
   try { await stream.write(bytes); await stream.close(); }
   catch (error) { try { await stream.abort(); } catch {} throw error; }
-  if (!equalBytes(await readBytes(file), bytes)) throw namedError("VerificationError", "active.js の書き込み後の内容が一致しません。");
+  if (!equalBytes(await readBytes(file), bytes)) throw namedError("VerificationError", file.name + " の書き込み後の内容が一致しません。");
 }
 
 export async function replaceActive(directory, bundle, after, { onBackup, readPackaged }) {

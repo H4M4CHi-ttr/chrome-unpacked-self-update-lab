@@ -5,6 +5,7 @@ const labels = {
   ready: "フォルダを登録すると自動更新を開始できます。",
   monitoring: "GitHub Releases を定期確認しています。",
   "up-to-date": "新しいリリースはありません。",
+  "package-unavailable": "最新リリースに全体更新用の署名済みパッケージがありません。",
   downloaded: "検証済みの更新があります。適用するには自動更新を有効にしてください。",
   "awaiting-updater": "HTTPS 更新ページでの処理を待っています。",
   "permission-required": "更新ページでフォルダを登録するか、書き込みを再許可してください。",
@@ -25,6 +26,7 @@ async function send(kind) {
 
 async function refresh() {
   const state = await send("status");
+  $("#manifest-version").textContent = state.manifestVersion;
   $("#enabled").textContent = state.enabled ? "有効" : "停止中";
   $("#interval").textContent = state.alarm?.periodInMinutes ? (state.alarm.periodInMinutes * 60) + " 秒" : "停止中";
   $("#pending").textContent = state.pending ?? state.transfer?.targetVersion ?? "なし";

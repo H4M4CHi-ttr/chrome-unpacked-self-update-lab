@@ -14,7 +14,7 @@ export function isAllowedWebSender(sender) {
 
 export function isValidMessage(message) {
   if (!message || message.protocol !== PROTOCOL) return false;
-  if (["info", "snapshot", "hash", "plan", "enable", "unblock"].includes(message.action)) return true;
+  if (["info", "snapshot", "hash", "package-marker", "plan", "enable", "unblock"].includes(message.action)) return true;
   if (message.action === "permission") return ["granted", "prompt", "denied", "not-selected"].includes(message.permission);
   if (message.action === "attention") return ["folder", "recovery"].includes(message.cause);
   if (message.action === "begin") return isToken(message.token) && isHash(message.beforeHash) && isHash(message.targetHash);

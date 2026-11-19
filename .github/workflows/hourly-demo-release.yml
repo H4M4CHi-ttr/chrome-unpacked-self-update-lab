@@ -92,5 +92,6 @@ jobs:
           gh release create "$TAG" \
             "$RUNNER_TEMP/demo-release/auto-update-https.zip" "$RUNNER_TEMP/demo-release/update.zip" \
             "$RUNNER_TEMP/demo-release/update.json" "$RUNNER_TEMP/demo-release/update.sig" \
+            "$RUNNER_TEMP/demo-release/package-update.json" "$RUNNER_TEMP/demo-release/package-update.sig" \
             --repo "$GITHUB_REPOSITORY" --title "$TAG" --latest \
-            --notes "自動更新を試すためのデモリリースです。マイナー版を1つ上げています。署名付きの active.js 更新と、新規インストール用 ZIP を同梱します。"
+            --notes "署名付きパッケージで配信ファイルを更新し、拡張機能管理画面のバージョンもリリース番号と揃えます。active.js のみを更新する旧版をお使いの場合は、auto-update-https.zip を一度読み込んでください。"

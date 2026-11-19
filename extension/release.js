@@ -1,6 +1,10 @@
 import { unzipSync } from "./vendor/fflate.js";
 import { MAX_CODE_BYTES, MAX_ZIP_BYTES, REPOSITORY } from "./config.js";
 import { namedError, sha256 } from "./core.js";
+import {
+  PACKAGE_FORMAT, PACKAGE_INDEX, PACKAGE_LIMIT, PACKAGE_METADATA, PACKAGE_SIGNATURE, PACKAGE_ZIP,
+  assertManifestVersion, hashFiles, hashInventory, packageInventory, validateInventory,
+} from "./package.js";
 
 export function compareVersions(left, right) {
   const parse = (value) => {
@@ -63,14 +67,22 @@ function assetURL(release, name) {
   return url.href;
 }
 
-export async function verifyManifest(raw, signature, publicKey, version, tag) {
+async function verifySignedRelease(raw, signature, publicKey, version, tag) {
   if (signature.length !== 64) throw namedError("SignatureError", "署名の形式が不正です。");
   const key = await crypto.subtle.importKey("jwk", publicKey, { name: "ECDSA", namedCurve: "P-256" }, false, ["verify"]);
   if (!await crypto.subtle.verify({ name: "ECDSA", hash: "SHA-256" }, key, signature, raw)) throw namedError("SignatureError", "配信情報の署名が一致しません。");
   const info = decodeJSON(raw);
+  if (info?.repository !== REPOSITORY || info.version !== version || info.tag !== tag) {
+    throw namedError("ReleaseError", "署名済み配信情報の対象・バージョン・タグが一致しません。");
+  }
+  return info;
+}
+
+export async function verifyManifest(raw, signature, publicKey, version, tag) {
+  const info = await verifySignedRelease(raw, signature, publicKey, version, tag);
   const validSize = (size, max) => Number.isSafeInteger(size) && size > 0 && size <= max;
   const validHash = (value) => typeof value === "string" && /^[a-f0-9]{64}$/.test(value);
-  if (info.format !== 1 || info.repository !== REPOSITORY || info.version !== version || info.tag !== tag ||
+  if (info.format !== 1 ||
       info.file?.path !== "active.js" || !validSize(info.file.bytes, MAX_CODE_BYTES) || !validHash(info.file.sha256) ||
       !validSize(info.zip?.bytes, MAX_ZIP_BYTES) || !validHash(info.zip.sha256)) throw namedError("ReleaseError", "署名済み配信情報の対象・版・パス・サイズが不正です。");
   return info;
@@ -90,10 +102,48 @@ export async function unpackVerified(zip, info) {
   return code;
 }
 
-export async function downloadCandidate(release, publicKey) {
-  const raw = await fetchLimited(assetURL(release, "update.json"), 8192);
-  const signature = await fetchLimited(assetURL(release, "update.sig"), 64);
-  const info = await verifyManifest(raw, signature, publicKey, release.version, release.tag_name);
-  const zip = await fetchLimited(assetURL(release, "update.zip"), info.zip.bytes);
-  return { version: info.version, tag: info.tag, sha256: info.file.sha256, code: await unpackVerified(zip, info) };
+export async function verifyPackageManifest(raw, signature, publicKey, version, tag) {
+  const info = await verifySignedRelease(raw, signature, publicKey, version, tag);
+  if (info.format !== PACKAGE_FORMAT || !Number.isSafeInteger(info.zip?.bytes) ||
+      info.zip.bytes < 1 || info.zip.bytes > PACKAGE_LIMIT || !/^[a-f0-9]{64}$/.test(info.zip.sha256 ?? "")) {
+    throw namedError("ReleaseError", "パッケージの配信形式・サイズ・ハッシュが不正です。");
+  }
+  validateInventory(info.files);
+  return info;
+}
+
+export async function unpackPackage(zip, info) {
+  if (zip.length !== info.zip.bytes || await sha256(zip) !== info.zip.sha256) {
+    throw namedError("IntegrityError", "パッケージ ZIP の SHA-256 またはサイズが一致しません。");
+  }
+  const seen = new Set();
+  let total = 0;
+  const archive = unzipSync(zip, { filter: (entry) => {
+    const prefix = "extension/";
+    const path = entry.name.slice(prefix.length);
+    total += entry.originalSize;
+    if (!entry.name.startsWith(prefix) || !Object.hasOwn(info.files, path) || seen.has(path) || total > PACKAGE_LIMIT) {
+      throw namedError("ReleaseError", "パッケージ ZIP のパス・重複・展開サイズが不正です。");
+    }
+    seen.add(path);
+    return true;
+  } });
+  const files = Object.fromEntries(Object.entries(archive).map(([path, bytes]) => [path.slice("extension/".length), bytes]));
+  if (seen.size !== Object.keys(info.files).length || Object.values(files).reduce((sum, bytes) => sum + bytes.length, 0) > PACKAGE_LIMIT) {
+    throw namedError("ReleaseError", "パッケージ ZIP のファイル数またはサイズが一致しません。");
+  }
+  const sha256sum = await hashInventory(info.files);
+  const index = await packageInventory(files[PACKAGE_INDEX]);
+  assertManifestVersion(files["manifest.json"], info.version);
+  if (index.version !== info.version || index.sha256 !== sha256sum || await hashInventory(await hashFiles(files)) !== sha256sum) {
+    throw namedError("IntegrityError", "パッケージとファイル一覧が一致しません。");
+  }
+  return { format: PACKAGE_FORMAT, version: info.version, tag: info.tag, sha256: sha256sum, files };
+}
+
+export async function downloadPackage(release, publicKey) {
+  const raw = await fetchLimited(assetURL(release, PACKAGE_METADATA), 32 * 1024);
+  const signature = await fetchLimited(assetURL(release, PACKAGE_SIGNATURE), 64);
+  const info = await verifyPackageManifest(raw, signature, publicKey, release.version, release.tag_name);
+  return unpackPackage(await fetchLimited(assetURL(release, PACKAGE_ZIP), info.zip.bytes), info);
 }

@@ -1,15 +1,18 @@
 import { version } from "./active.js";
 import { LOCK, isAllowedWebSender, isUpdaterTab, isValidMessage, updaterURL } from "./bridge.js";
 import { CHECK_ALARM, CHECK_MINUTES } from "./config.js";
-import { loadBundle, namedError, readOwn, sha256 } from "./core.js";
-import { compareVersions, downloadCandidate, latestRelease } from "./release.js";
+import { namedError, readOwn, sha256 } from "./core.js";
+import {
+  PACKAGE_FORMAT, PACKAGE_INDEX, PACKAGE_METADATA, PACKAGE_SIGNATURE, PACKAGE_ZIP,
+  assertCompatibleManifest, decodeJSON, hashFiles, hashInventory, readOwnPackage,
+} from "./package.js";
+import { compareVersions, downloadPackage, latestRelease } from "./release.js";
 import { load, readEvents, record, save, saveAll } from "./store.js";
 
 const bootId = crypto.randomUUID();
+const { version: manifestVersion, version_name: displayVersion = manifestVersion } = chrome.runtime.getManifest();
 const locked = (task) => navigator.locks.request(LOCK, task);
-const encoded = (bytes) => Array.from(bytes);
-const decodeJSON = (bytes) => JSON.parse(new TextDecoder().decode(bytes));
-const ownHash = async () => sha256(await readOwn("active.js"));
+const ownHash = async () => (await readOwnPackage()).sha256;
 
 async function status(phase, data = {}) {
   const event = { phase, executingVersion: version, ...data };
@@ -54,25 +57,36 @@ async function openUpdater(active) {
   await record({ phase: tab ? "updater-reused" : "updater-opened", tabId, requestedActive: active });
 }
 
-async function verifyInstalled(hash) {
+async function verifyInstalled(bundle) {
   const receipt = await load("receipt");
-  if (receipt?.status === "written") {
+  if (receipt?.format === PACKAGE_FORMAT && receipt.status === "written") {
     const transfer = await load("transfer");
-    if (transfer?.fromVersion === version && transfer.beforeHash === hash) {
+    if (transfer?.fromVersion === version && manifestVersion === version && displayVersion === version && transfer.beforeHash === bundle.sha256) {
       await saveAll({ transfer: null, receipt: transfer.previousReceipt ?? null, blocked: null, enabled: false });
       await chrome.alarms.clear(CHECK_ALARM);
       await status("restored");
       return;
     }
   }
-  const expected = receipt ?? decodeJSON(await readOwn("install.json"));
-  if (expected.version !== version || expected.sha256 !== hash) {
-    throw namedError("SourceMismatchError", "実行中の版または active.js が、記録された版と一致しません。");
+  if (manifestVersion !== version || displayVersion !== version || bundle.version !== version ||
+      (receipt?.format === PACKAGE_FORMAT && (receipt.version !== version || receipt.sha256 !== bundle.sha256))) {
+    throw namedError("SourceMismatchError", "実行中のコード・manifest.json・パッケージの記録が一致しません。");
   }
-  if (receipt?.status === "written") {
+  if (receipt?.format === PACKAGE_FORMAT && receipt.status === "written") {
     await saveAll({ receipt: { ...receipt, status: "executed", bootId, observedAt: new Date().toISOString() }, transfer: null });
-    await record({ phase: "execution-confirmed", version, sha256: hash, bootId });
+    await record({ phase: "execution-confirmed", version, manifestVersion, sha256: bundle.sha256, bootId });
   }
+}
+
+async function verifyCandidate(pending, bundle) {
+  const hashes = await hashFiles(pending.files);
+  if (await hashInventory(hashes) !== pending.sha256 || compareVersions(pending.version, bundle.version) <= 0) {
+    throw namedError("IntegrityError", "保存したパッケージを再検証できません。");
+  }
+  if (hashes["trust.json"] !== bundle.files["trust.json"] || hashes["poc-identity.json"] !== bundle.files["poc-identity.json"]) {
+    throw namedError("PackageError", "公開鍵または拡張機能の識別情報を変更するには、新しい ZIP から読み込み直してください。");
+  }
+  assertCompatibleManifest(decodeJSON(await readOwn("manifest.json")), pending.files["manifest.json"], pending.version);
 }
 
 async function wakeUpdater(reason, pending) {
@@ -92,7 +106,8 @@ async function check(reason) {
       return;
     }
     if (Date.now() < (await load("retryAt") ?? 0)) return;
-    await verifyInstalled(await ownHash());
+    const bundle = await readOwnPackage();
+    await verifyInstalled(bundle);
     const release = await latestRelease();
     await record({ phase: "release-checked", reason, latest: release.version });
     if (compareVersions(release.version, version) <= 0) {
@@ -100,12 +115,17 @@ async function check(reason) {
       await status("up-to-date", { reason, latest: release.version });
       return;
     }
-    const revision = JSON.stringify(release.assets.filter(({ name }) => ["update.json", "update.sig", "update.zip"].includes(name))
+    const revision = JSON.stringify(release.assets.filter(({ name }) => [PACKAGE_METADATA, PACKAGE_SIGNATURE, PACKAGE_ZIP].includes(name))
       .map(({ name, id, updated_at }) => [name, id, updated_at]));
     let pending = await load("pending");
-    if (pending?.tag !== release.tag_name || pending.revision !== revision) {
+    if (pending?.format !== PACKAGE_FORMAT || pending.tag !== release.tag_name || pending.revision !== revision) {
       await save("pending", null);
-      pending = { ...await downloadCandidate(release, decodeJSON(await readOwn("trust.json"))), revision };
+      if (!release.assets.some(({ name }) => name === PACKAGE_METADATA)) {
+        await status("package-unavailable", { reason, latest: release.version });
+        return;
+      }
+      pending = { ...await downloadPackage(release, decodeJSON(await readOwn("trust.json"))), revision };
+      await verifyCandidate(pending, bundle);
       await save("pending", pending);
       await record({ phase: "downloaded-verified-unpacked", reason, targetVersion: pending.version, sha256: pending.sha256 });
     }
@@ -121,11 +141,11 @@ async function info() {
   const receipt = await load("receipt");
   const transfer = await load("transfer");
   return {
-    version, bootId, enabled: Boolean(await load("enabled")),
+    version, manifestVersion, bootId, enabled: Boolean(await load("enabled")),
     pending: (await load("pending"))?.version ?? null,
     permission: (await load("permission")) ?? "not-selected",
     transfer: transfer && { token: transfer.token, fromVersion: transfer.fromVersion, targetVersion: transfer.targetVersion, beforeHash: transfer.beforeHash, targetHash: transfer.targetHash, written: receipt?.status === "written" },
-    receipt: receipt && { version: receipt.version, sha256: receipt.sha256, status: receipt.status, bootId: receipt.bootId },
+    receipt: receipt && { format: receipt.format, version: receipt.version, sha256: receipt.sha256, status: receipt.status, bootId: receipt.bootId },
     status: await load("status"),
   };
 }
@@ -140,8 +160,8 @@ chrome.runtime.onStartup.addListener(() => {
 async function start() {
   await ensureAlarm();
   try {
-    await verifyInstalled(await ownHash());
-    await record({ phase: "worker-started", version, bootId });
+    await verifyInstalled(await readOwnPackage());
+    await record({ phase: "worker-started", version, manifestVersion, bootId });
   } catch (error) {
     if (!await load("transfer")) throw error;
   }
@@ -175,8 +195,9 @@ async function webMessage(message, sender) {
   const transfer = await load("transfer");
   switch (message.action) {
     case "info": return info();
-    case "snapshot": return loadBundle();
+    case "snapshot": return readOwnPackage();
     case "hash": return ownHash();
+    case "package-marker": return sha256(await readOwn(PACKAGE_INDEX));
     case "permission": {
       await save("permission", message.permission);
       const blocked = await load("blocked");
@@ -213,25 +234,26 @@ async function webMessage(message, sender) {
     }
     case "plan": {
       const pending = await load("pending");
-      if (!pending || !await load("enabled") || transfer || await load("blocked")) return null;
-      const bundle = await loadBundle();
-      await verifyInstalled(bundle.sha256);
-      if (compareVersions(pending.version, version) <= 0 || await sha256(pending.code) !== pending.sha256 ||
-          pending.sha256 === bundle.sha256) throw namedError("IntegrityError", "保存した更新候補を再検証できません。");
-      return { bundle, version: pending.version, sha256: pending.sha256, code: encoded(pending.code) };
+      if (pending?.format !== PACKAGE_FORMAT || !await load("enabled") || transfer || await load("blocked")) return null;
+      const bundle = await readOwnPackage();
+      await verifyInstalled(bundle);
+      await verifyCandidate(pending, bundle);
+      const files = Object.fromEntries(Object.entries(pending.files).map(([path, bytes]) => [path, Array.from(bytes)]));
+      return { format: PACKAGE_FORMAT, bundle, version: pending.version, sha256: pending.sha256, files };
     }
     case "begin": {
       if (transfer?.token === message.token) return true;
       const pending = await load("pending");
-      if (transfer || !pending || !await load("enabled") || await load("blocked") ||
+      if (transfer || pending?.format !== PACKAGE_FORMAT || !await load("enabled") || await load("blocked") ||
           pending.sha256 !== message.targetHash || compareVersions(pending.version, version) <= 0) {
         throw namedError("UpdateChangedError", "更新候補または設定が変わりました。次の確認で再試行します。");
       }
-      const hash = await ownHash();
-      await verifyInstalled(hash);
-      if (message.beforeHash !== hash) throw namedError("SourceMismatchError", "書き込み前に active.js が変更されました。");
+      const bundle = await readOwnPackage();
+      await verifyInstalled(bundle);
+      await verifyCandidate(pending, bundle);
+      if (message.beforeHash !== bundle.sha256) throw namedError("SourceMismatchError", "書き込み前にパッケージが変更されました。");
       await save("transfer", {
-        token: message.token, beforeHash: hash, targetHash: pending.sha256, targetVersion: pending.version,
+        token: message.token, beforeHash: bundle.sha256, targetHash: pending.sha256, targetVersion: pending.version,
         fromVersion: version, previousReceipt: await load("receipt"),
       });
       return true;
@@ -241,7 +263,7 @@ async function webMessage(message, sender) {
         throw namedError("FolderValidationError", "Chrome の読み込み元に書き換えが反映されていません。");
       }
       const receipt = {
-        version: transfer.targetVersion, sha256: transfer.targetHash, status: "written",
+        format: PACKAGE_FORMAT, version: transfer.targetVersion, sha256: transfer.targetHash, status: "written",
         writtenAt: new Date().toISOString(),
       };
       await saveAll({ receipt, pending: null, blocked: null });
@@ -262,7 +284,9 @@ async function webMessage(message, sender) {
       await saveAll({ transfer: null, receipt: transfer.previousReceipt ?? null, blocked: null,
         ...(message.pause ? { enabled: false } : {}) });
       if (message.pause) await chrome.alarms.clear(CHECK_ALARM);
-      if (written) setTimeout(() => chrome.runtime.reload(), 400);
+      if (written || version !== transfer.fromVersion || manifestVersion !== transfer.fromVersion) {
+        setTimeout(() => chrome.runtime.reload(), 400);
+      }
       await status("restored", { version: transfer.fromVersion });
       return true;
     }

@@ -2,11 +2,11 @@
 
 Chrome の開発者モードで配布する拡張機能を対象に、初回の許可後は新しい GitHub Release を無操作で適用する構成です。Chrome ウェブストア用の配信には使いません。まず [日本語 README](README.ja.MD) のデモで流れを確認し、その後に下記の設定を差し替えてください。
 
-## 更新対象は専用の1ファイルに限定する
+## 配信するファイルを決める
 
-対象の拡張機能に、更新可能な処理をまとめた `active.js` と、固定のサービスワーカーを置きます。`active.js` は `version` をエクスポートします。デモはコードの版と `manifest.json` の版を別に管理しています。GitHub Release のタグはコードの版と合わせてください。
+`tools/build-release.mjs` の `packagePaths` に配信するファイルを登録します。デモでは `active.js` が `version` をエクスポートし、ビルド時に `manifest.json` と同じバージョンになります。GitHub Release のタグもこれに合わせます。
 
-[extension/core.js](extension/core.js) の固定ファイル一覧は、移植先の manifest、識別ファイル、更新処理などに合わせます。Chrome が現在読み込んでいるファイルとの一致を確かめます。同じ内容のコピーは読み取りだけで見分けられないため、書き込み後に Chrome 側からも読み返し、一致しなければコピーを旧版に戻します。複数ファイルや manifest の入れ替えを対象にするなら、途中で止まった場合の復旧方法を別途設計してください。
+ファイルを追加・削除するときは `packagePaths` に反映します。更新ページは以前から管理しているファイルのうち、新しい一覧から外れたものだけを削除します。元の状態をバックアップし、インストール記録の変更が Chrome にも反映されることを確かめてから対象ファイルを書き換えます。Chrome が新しい manifest とコードで起動したことを確認するまでバックアップを保持します。
 
 ## 配信先・更新ページ・信頼する鍵を差し替える
 
@@ -16,7 +16,8 @@ Chrome の開発者モードで配布する拡張機能を対象に、初回の�
 | extension/bridge.js の UPDATER_URL | 自分が管理する専用 HTTPS オリジンの更新ページ |
 | extension/manifest.json | ページのオリジンを host_permissions、ページの URL パターンを externally_connectable.matches に反映 |
 | extension/poc-identity.json | 移植先固有の識別情報 |
-| extension/trust.json と extension/install.json | 自分の公開鍵と、最初に配布する active.js の版・SHA-256 |
+| extension/trust.json | 自分のリリース署名用の公開鍵 |
+| extension/install.json | 配信ファイルのハッシュを記したインストール記録。配布 ZIP にはビルド時に生成される |
 | docs/updater | 自分の HTTPS オリジンへ配置。ページが参照する CSS も同梱。設定変更後に node tools/sync-updater.mjs を実行 |
 
 オリジンとは、プロトコル・ホスト名・ポートの組み合わせです。Chrome のフォルダ許可はオリジン単位です。同じホスト上の別ページも同じ権限の境界に入るため、実運用では更新専用のホストを使い、第三者の埋め込みやスクリプトは避けてください。リリース署名が保護するのは配信物です。HTTPS ページ自体が改ざんされた場合のファイル操作も署名で防げる、とは考えないでください。この公開デモには検証専用フォルダだけを登録してください。
@@ -31,11 +32,17 @@ openssl genpkey -algorithm EC -pkeyopt ec_paramgen_curve:prime256v1 -out <秘密
 node tools/create-update.mjs 1.0.0 extension/active.js <秘密ディレクトリ>/updates.pem <空きパス>/seed
 ~~~
 
-初回配布にだけ、生成された trust.json と install.json を extension にコピーします。active.js と残りの拡張ファイルをまとめて配布します。次のリリースでは、版を上げた active.js を別の作業場所で作り、同じ鍵で署名します。
+初回は生成した `trust.json` を `extension` にコピーします。`create-update.mjs` が作るほかのファイルは旧方式用です。パッケージ全体に署名するには `build-release.mjs` を使います。次のリリースでも同じ鍵を使い、配信するバージョンをコマンドに指定します。
 
 ~~~powershell
-node tools/create-update.mjs 1.1.0 <新しいソース>/active.js <秘密ディレクトリ>/updates.pem <空きパス>/v1.1.0
-gh release create v1.1.0 <空きパス>/v1.1.0/update.json <空きパス>/v1.1.0/update.sig <空きパス>/v1.1.0/update.zip --latest
+$env:DEMO_SIGNING_KEY_PEM = Get-Content -Raw -LiteralPath '<秘密ディレクトリ>/updates.pem'
+try {
+  node tools/build-release.mjs 1.1.0 '<空きパス>/v1.1.0'
+  if ($LASTEXITCODE -ne 0) { throw 'Release build failed' }
+} finally {
+  Remove-Item Env:DEMO_SIGNING_KEY_PEM
+}
+gh release create v1.1.0 '<空きパス>/v1.1.0/auto-update-https.zip' '<空きパス>/v1.1.0/package-update.json' '<空きパス>/v1.1.0/package-update.sig' --latest
 ~~~
 
 上のコマンドの <> 部分は実際のパスに置き換えてください。アセットをそろえてから通常リリースとして公開します。下書きとプレリリースは latest の対象外です。秘密鍵は配信者が管理し、コミットや公開アセット、エージェントの出力に含めないでください。自分の拡張機能は、自分の公開鍵を固定した初期版から始めます。鍵を切り替えるときは、新しい公開鍵を同梱した ZIP を再配布します。
@@ -46,6 +53,6 @@ gh release create v1.1.0 <空きパス>/v1.1.0/update.json <空きパス>/v1.1.0
 
 ## AI エージェントへ渡す依頼の例
 
-> このリポジトリの AGENTS.md と PORTING.md を読み、開発者モードで読み込む私の拡張機能に自動更新を追加してください。まず更新可能なコードを1ファイルに分け、既存機能と権限を調べてください。GitHub の新しい通常リリースを署名検証し、初回に私が許可した専用 HTTPS ページから書き換え、実際の新版起動をハッシュと実行結果で確認できるようにしてください。リリース先、更新ページの専用オリジン、許可するファイルは明示し、権限がない場合は書かずに待ってください。毎時リリースの cron は移植せず、既存の公開手順を使ってください。秘密鍵を表示せず、公開作業は別途指示があるまで行わないでください。未検証の条件も報告してください。
+> このリポジトリの AGENTS.md と PORTING.md を読み、開発者モードで読み込む私の拡張機能に自動更新を追加してください。既存の権限と配信対象のファイルを調べ、署名とファイルのハッシュを検証してから、初回に私が許可した専用 HTTPS ページで更新してください。再読み込み後は manifest のバージョンと新版の実行を確認し、途中で止まったらバックアップから復元できるようにしてください。毎時リリースの cron は移植せず、既存の公開手順を使ってください。秘密鍵を表示せず、公開作業は別途指示があるまで行わないでください。未検証の条件も報告してください。
 
 追加の確認先: [Chrome の永続的なファイル権限](https://developer.chrome.com/blog/persistent-permissions-for-the-file-system-access-api)、[外部ページからのメッセージ](https://developer.chrome.com/docs/extensions/develop/concepts/messaging#external-webpage)、[GitHub Releases API](https://docs.github.com/en/rest/releases/releases#get-the-latest-release)。

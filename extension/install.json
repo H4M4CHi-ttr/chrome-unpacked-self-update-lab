@@ -1,4 +1,23 @@
 {
+  "format": 2,
   "version": "1.0.0",
-  "sha256": "686bd712953729eee833c2b4162a46e635912e9a1bb29545eb3cb5acaa67fbdc"
+  "sha256": "686bd712953729eee833c2b4162a46e635912e9a1bb29545eb3cb5acaa67fbdc",
+  "files": {
+    "manifest.json": "ccf34ee42aa29be9c0488065639d8f99484b1bacec4d3c17e711fc1167cb626f",
+    "poc-identity.json": "dc9d5ff2788ef41da82874653a08b425f9d30c4d6707ea6bc39bee7dc5e72b42",
+    "popup.html": "f6cc337a960886712bd927b8a89ea3443c96f727caab0311d70c520f14a9c738",
+    "popup.css": "1c997e51b4a4b11777f2259d1029fd52c66ff962c2078cf6f2bb9f3768dfec56",
+    "popup.js": "5d3d103ee3864ac9fa873d32da536309d9cc8c3b95d00803644728d9b384c87d",
+    "worker.js": "68ed7ec4518d028990226b646e0d635c4f12437b25722399b37738236d3bbeb4",
+    "core.js": "992d07aae332f18d972ef330cec8d9e9feb45fc66f7b46e3d229eec8ada951e6",
+    "store.js": "f955c8be7794c26a673cee0f9d9ca081904ace569649d05ef1c0fd886b862857",
+    "release.js": "6466d87eb6d6c847c69c908f861aff1a65bb4b72d8cc4ac04006865781a52ee2",
+    "config.js": "ec35f55ab6a9492e6ed905871a38acc625811cb8d1793cb334937bb7f807fdcb",
+    "bridge.js": "4bbfcd1300ce8bb0cd6ff2d116f2b090d8716fd2bd757d47e01497496ec929d7",
+    "trust.json": "d9b3f3035f9a2e9dbb59c4aa7a242f18eb1eda9184a6eba0ff276d55009233ea",
+    "vendor/fflate.js": "b7ca4450b19559a1d50eb381adcee94b82449674be4cd17789d9beba7e6122a1",
+    "vendor/LICENSE.fflate": "0a1df3a083d0c010560aa342e87959c8c1070e6fd54545741f083f22d0c8b551",
+    "active.js": "686bd712953729eee833c2b4162a46e635912e9a1bb29545eb3cb5acaa67fbdc",
+    "package.js": "2624c225384fc398fe23423915fd4336eb3dd361dae63724f1b53eddf22f4e51"
+  }
 }

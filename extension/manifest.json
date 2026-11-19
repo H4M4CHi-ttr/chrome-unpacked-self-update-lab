@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "GitHub 自己更新実験",
   "version": "1.0.0",
-  "description": "GitHub Releases の署名付き ZIP を定期確認し、選択フォルダの active.js だけを更新する実験用拡張。",
+  "description": "GitHub Releases の署名付き ZIP を検証し、manifest.json を含む拡張機能一式を更新する実験用拡張。",
   "permissions": ["alarms"],
   "host_permissions": [
     "https://api.github.com/*",
