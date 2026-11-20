@@ -1,9 +1,7 @@
 name: Hourly demo release
 
 on:
-  # This schedule exists only to generate updates for this lab. Omit it when porting the updater.
-  schedule:
-    - cron: "17,37,57 * * * *"
+  # cron-job.org calls workflow_dispatch every hour for this demo.
   workflow_dispatch:
     inputs:
       publish:
@@ -29,7 +27,7 @@ jobs:
         id: cadence
         env:
           GH_TOKEN: ${{ github.token }}
-          PUBLISH_REQUESTED: ${{ github.event_name == 'schedule' || inputs.publish == true }}
+          PUBLISH_REQUESTED: ${{ inputs.publish == true }}
         run: |
           release="$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq '[.tag_name, .published_at] | @tsv')"
           IFS=$'\t' read -r latest published_at <<< "$release"
@@ -38,10 +36,17 @@ jobs:
             exit 1
           fi
           published_epoch="$(date -u -d "$published_at" +%s)"
-          now="$(date -u +%s)"
-          if [[ "$PUBLISH_REQUESTED" == "true" ]] && (( now - published_epoch < 3600 )); then
-            echo "The latest release ($latest) was published less than 60 minutes ago. Skipping build and publish."
-            exit 0
+          if [[ "$PUBLISH_REQUESTED" == "true" ]]; then
+            wait_seconds=$((published_epoch + 3600 - $(date -u +%s)))
+            if (( wait_seconds > 120 )); then
+              echo "The latest release ($latest) was published less than 58 minutes ago. Skipping build and publish."
+              exit 0
+            fi
+            # An on-the-hour dispatch can land seconds before the release cooldown ends.
+            if (( wait_seconds > 0 )); then
+              echo "Waiting $wait_seconds seconds before the next release is eligible."
+              sleep "$wait_seconds"
+            fi
           fi
           printf 'latest=%s\n' "$latest" >> "$GITHUB_OUTPUT"
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -57,7 +62,7 @@ jobs:
         if: steps.cadence.outputs.latest != ''
         run: |
           node --test tests/*.test.mjs
-          node tools/sync-updater.mjs --check
+          node tools/build-release.mjs --check-index
       - name: Calculate next version from the latest published release
         id: version
         if: steps.cadence.outputs.latest != ''
@@ -73,7 +78,7 @@ jobs:
           TAG: ${{ steps.version.outputs.tag }}
         run: node tools/build-release.mjs "${TAG#v}" "$RUNNER_TEMP/demo-release"
       - name: Publish the demo release
-        if: steps.version.outputs.tag != '' && (github.event_name == 'schedule' || inputs.publish == true)
+        if: steps.version.outputs.tag != '' && inputs.publish == true
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ steps.version.outputs.tag }}
@@ -93,5 +98,5 @@ jobs:
             "$RUNNER_TEMP/demo-release/auto-update-https.zip" "$RUNNER_TEMP/demo-release/update.zip" \
             "$RUNNER_TEMP/demo-release/update.json" "$RUNNER_TEMP/demo-release/update.sig" \
             "$RUNNER_TEMP/demo-release/package-update.json" "$RUNNER_TEMP/demo-release/package-update.sig" \
-            --repo "$GITHUB_REPOSITORY" --title "$TAG" --latest \
-            --notes "署名付きパッケージで配信ファイルを更新し、拡張機能管理画面のバージョンもリリース番号と揃えます。active.js のみを更新する旧版をお使いの場合は、auto-update-https.zip を一度読み込んでください。"
+            --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "$TAG" --latest \
+            --notes "拡張機能内の「更新設定」でフォルダを登録すると、署名付きリリースを適用できます。旧 HTTPS 更新ページ版からの移行には、この ZIP を展開して手動で読み込み、フォルダを登録してください。"

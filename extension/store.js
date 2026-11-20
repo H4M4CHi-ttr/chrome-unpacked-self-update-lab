@@ -1,3 +1,8 @@
+import { RELEASE_TOKEN_KEY } from "./config.js";
+
+// Older installations keep their Pages-era transactions; the release credential is shared across the migration.
+const stateKey = (key) => key === RELEASE_TOKEN_KEY ? key : "internal:" + key;
+
 const database = new Promise((resolve, reject) => {
   const request = indexedDB.open("github-unpacked-self-update-lab", 1);
   request.onupgradeneeded = () => {
@@ -19,9 +24,9 @@ async function transact(name, mode, action) {
   });
 }
 
-export const load = (key) => transact("state", "readonly", (store) => store.get(key));
+export const load = (key) => transact("state", "readonly", (store) => store.get(stateKey(key)));
 export const saveAll = (values) => transact("state", "readwrite", (store) => {
-  for (const [key, value] of Object.entries(values)) store.put(value, key);
+  for (const [key, value] of Object.entries(values)) store.put(value, stateKey(key));
   return null;
 });
 export const save = (key, value) => saveAll({ [key]: value });

@@ -1,0 +1,85 @@
+{
+  "environment": "Chrome/157.0.8103.79",
+  "platform": "Windows 11",
+  "setupPage": "popup.html",
+  "transport": "isolated loopback Release metadata and signed ZIPs; test P-256 key; 30s alarm",
+  "productionCheckIntervalMinutes": 5,
+  "initial": {
+    "codeHash": "686bd712953729eee833c2b4162a46e635912e9a1bb29545eb3cb5acaa67fbdc",
+    "disk": "1.0.0"
+  },
+  "setup": {
+    "folderChosenAtUtc": "2026-11-19T23:30:27.402Z",
+    "permissionOnFirstRevisit": "prompt",
+    "reapprovedAtUtc": "2026-11-19T23:30:42.477Z",
+    "extensionPagesClosedAtUtc": "2026-11-19T23:30:42.556Z",
+    "uiActions": [
+      "initial-folder-selection",
+      "requestPermission:return-visit",
+      "enable"
+    ]
+  },
+  "updates": [
+    {
+      "target": "1.1.0",
+      "browserVersion": "1.1.0",
+      "afterPermission": "許可あり / extension",
+      "codeHash": "19437e75892db84b836afc0f64b05a13137c4ec48c602e55b19c73bb1942ba27",
+      "verifiedFiles": 16,
+      "reason": "alarm",
+      "permissionClicksSinceRelease": 0,
+      "newWorker": true,
+      "receipt": "executed",
+      "confirmedAtUtc": "2026-11-19T23:31:18.901Z",
+      "releaseZipSha256": "581c055785096769ba8b128842025c78fb3d8ab5e3e6d1eddaf87f17591c7693"
+    },
+    {
+      "target": "1.2.0",
+      "browserVersion": "1.2.0",
+      "afterPermission": "許可あり / extension",
+      "codeHash": "a5a49ea14bdfc436f2c9c16bd5fd083eaefc5fb1ba56cb827dc7f6b2d1e4403f",
+      "verifiedFiles": 16,
+      "reason": "alarm",
+      "permissionClicksSinceRelease": 0,
+      "newWorker": true,
+      "receipt": "executed",
+      "confirmedAtUtc": "2026-11-19T23:31:53.743Z",
+      "releaseZipSha256": "284b938d8aae8ec4f5e38961eff11851806c08952c2ffccf22d4c7f056c78660"
+    },
+    {
+      "target": "1.3.0",
+      "browserVersion": "1.3.0",
+      "afterPermission": "許可あり / extension",
+      "codeHash": "225788c0df254f567401bda8e830b00825d6acffec798650ea90faf40e73ec16",
+      "verifiedFiles": 16,
+      "reason": "browser-startup",
+      "permissionClicksSinceRelease": 0,
+      "newWorker": true,
+      "receipt": "executed",
+      "confirmedAtUtc": "2026-11-19T23:32:06.323Z",
+      "releaseZipSha256": "a39b348c39808f0824d125ad2a8f9e50372e3567d8843e91421d169cb4bb9c7a"
+    }
+  ],
+  "browserRestart": {
+    "observedAtUtc": "2026-11-19T23:31:57.303Z",
+    "extensionRegistrationRetained": true
+  },
+  "forgetClearedRegistration": true,
+  "completedAtUtc": "2026-11-19T23:32:06.372Z",
+  "publicFeedReadOnly": {
+    "observedAtUtc": "2026-11-19T23:39:07.426Z",
+    "browser": "Chrome/157.0.8103.79",
+    "source": "public GitHub Releases",
+    "repository": "H4M4CHi-ttr/chrome-unpacked-self-update-lab",
+    "tag": "v1.21.0",
+    "signedPackageHash": "675adf276cd512fe51efcea6abc7626266f1d726faab7a169306ca7869fef8d9",
+    "verifiedFiles": 17,
+    "releaseManifestVersion": "1.21.0",
+    "publishedManifestUsesWebUpdater": true,
+    "workerCheck": "manual-check",
+    "workerMessage": "manifest.json の host_permissions を変更するには、新しい ZIP から読み込み直してください。",
+    "workerPhase": "error",
+    "workerErrorName": "PackageError",
+    "applied": false
+  }
+}

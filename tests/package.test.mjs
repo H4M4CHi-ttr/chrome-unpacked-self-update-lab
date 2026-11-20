@@ -1,9 +1,13 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { cp, mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
+import { pathToFileURL } from "node:url";
 import { REPOSITORY } from "../extension/config.js";
 import { sha256 } from "../extension/core.js";
 import { PACKAGE_FORMAT, assertCompatibleManifest, hashFiles, packageInventory, replacePackage, restorePackage } from "../extension/package.js";
-import { unpackPackage, verifyPackageManifest } from "../extension/release.js";
+import { downloadPackage, latestRelease, unpackPackage, verifyPackageManifest } from "../extension/release.js";
 import { zipSync } from "../extension/vendor/fflate.js";
 
 const encode = (str) => new TextEncoder().encode(str);
@@ -24,8 +28,8 @@ async function fixtureFiles(version, extras = {}) {
   return { ...files, "install.json": json({ format: PACKAGE_FORMAT, version, sha256: hashes["active.js"], files: hashes }) };
 }
 
-async function signedPackage(files, { extra = {}, metadata = {} } = {}) {
-  const pair = await crypto.subtle.generateKey({ name: "ECDSA", namedCurve: "P-256" }, false, ["sign", "verify"]);
+async function signedPackage(files, { extra = {}, metadata = {}, keyPair } = {}) {
+  const pair = keyPair ?? await crypto.subtle.generateKey({ name: "ECDSA", namedCurve: "P-256" }, false, ["sign", "verify"]);
   const publicKey = await crypto.subtle.exportKey("jwk", pair.publicKey);
   const archive = Object.fromEntries(Object.entries(files).map(([path, bytes]) => ["extension/" + path, bytes]));
   const zip = zipSync({ ...archive, ...extra });
@@ -33,7 +37,7 @@ async function signedPackage(files, { extra = {}, metadata = {} } = {}) {
     zip: { bytes: zip.length, sha256: await sha256(zip) }, files: await hashFiles(files), ...metadata });
   const signature = new Uint8Array(await crypto.subtle.sign({ name: "ECDSA", hash: "SHA-256" }, pair.privateKey, raw));
   const verify = () => verifyPackageManifest(raw, signature, publicKey, newVersion, "v" + newVersion);
-  return { zip, verify, signature };
+  return { zip, verify, signature, raw, publicKey };
 }
 
 test("the signed install ZIP binds the manifest and every package file", async () => {
@@ -48,6 +52,50 @@ test("the signed install ZIP binds the manifest and every package file", async (
   await assert.rejects(unpackPackage(tampered, info), { name: "IntegrityError" });
   signed.signature[0] ^= 1;
   await assert.rejects(signed.verify(), { name: "SignatureError" });
+});
+
+test("downloads a verified release without credentials for public repos and by API asset ID for private repos", async (t) => {
+  const files = await fixtureFiles(newVersion);
+  const { raw, signature, zip, publicKey } = await signedPackage(files);
+  const tag = "v" + newVersion;
+  const api = `https://api.github.com/repos/${REPOSITORY}/releases`;
+  const names = ["package-update.json", "package-update.sig", "auto-update-https.zip"];
+  const payloads = [raw, signature, zip];
+  for (const token of [undefined, "fixture-token"]) {
+    await t.test(token ? "private" : "public", async (t) => {
+      const assets = names.map((name, index) => ({
+        name, id: index + 1,
+        browser_download_url: token ? "https://untrusted.example/" + name
+          : `https://github.com/${REPOSITORY}/releases/download/${tag}/${name}`,
+      }));
+      const expected = [
+        [api + "/latest", "application/vnd.github+json", json({ tag_name: tag, assets })],
+        ...assets.map((asset, index) => [
+          token ? api + "/assets/" + asset.id : asset.browser_download_url,
+          token ? "application/octet-stream" : null,
+          payloads[index],
+        ]),
+      ];
+      const fetch = t.mock.method(globalThis, "fetch", async (url, options) => {
+        const [target, accept, body] = expected.shift();
+        const headers = new Headers(options.headers);
+        assert.equal(url, target);
+        assert.equal(headers.get("accept"), accept);
+        assert.equal(headers.get("authorization"), token ? "Bearer " + token : null);
+        assert.equal(options.credentials, "omit");
+        return new Response(body);
+      });
+      const release = await latestRelease(token);
+      const pending = await downloadPackage(release, publicKey, token);
+      assert.deepEqual(pending.files, files);
+      assert.equal(expected.length, 0);
+      if (token) {
+        release.assets[0].id = "1/../../untrusted";
+        await assert.rejects(downloadPackage(release, publicKey, token), { name: "ReleaseError" });
+        assert.equal(fetch.mock.callCount(), 4);
+      }
+    });
+  }
 });
 
 test("rejects unlisted ZIP entries even when the archive is signed", async () => {
@@ -139,6 +187,110 @@ function fakeDirectory(initial) {
   });
   return { directory: folder(""), files, events, fail };
 }
+
+
+test("the internal worker holds a signed update, protects an identical copy and confirms it only on the next boot", async (t) => {
+  const keyPair = await crypto.subtle.generateKey({ name: "ECDSA", namedCurve: "P-256" }, true, ["sign", "verify"]);
+  const trust = json(await crypto.subtle.exportKey("jwk", keyPair.publicKey));
+  const before = await fixtureFiles(oldVersion, { "trust.json": trust });
+  const after = await fixtureFiles(newVersion, { "trust.json": trust });
+  const { raw, signature, zip } = await signedPackage(after, { keyPair });
+  const assets = new Map([["package-update.json", raw], ["package-update.sig", signature], ["auto-update-https.zip", zip]]);
+  const disk = fakeDirectory(before), copy = fakeDirectory(before);
+  let permission = "prompt", reloads = 0, receiver, alarm;
+  disk.directory.queryPermission = async () => permission;
+  const state = new Map([["directory", disk.directory], ["enabled", true]]);
+  const events = [];
+  const store = {
+    load: async (key) => state.get(key),
+    save: async (key, value) => state.set(key, value),
+    saveAll: async (values) => { for (const [key, value] of Object.entries(values)) state.set(key, value); },
+    record: async (event) => events.push(event),
+    readEvents: async () => events,
+  };
+  const extensionId = "a".repeat(32);
+  const ownURL = (name) => "chrome-extension://" + extensionId + "/" + name;
+  const sender = { id: extensionId, url: ownURL("popup.html") };
+  const chromeAPI = {
+    runtime: {
+      id: extensionId, getURL: ownURL, getManifest: () => JSON.parse(new TextDecoder().decode(disk.files.get("manifest.json"))),
+      reload: () => { reloads++; }, onMessage: { addListener: (fn) => { receiver = fn; } },
+      onStartup: { addListener() {} },
+    },
+    action: { async setBadgeText() {} },
+    alarms: {
+      get: async () => alarm, create: async (_, info) => { alarm = info; }, clear: async () => { alarm = null; },
+      onAlarm: { addListener() {} },
+    },
+  };
+
+  const parent = await realpath(tmpdir());
+  const root = await mkdtemp(join(parent, "extension-worker-test-"));
+  let tail = Promise.resolve();
+  const locks = { request: (_, task) => { const result = tail.then(task); tail = result.catch(() => {}); return result; } };
+  Object.defineProperty(navigator, "locks", { value: locks, configurable: true });
+  globalThis.chrome = chromeAPI;
+  globalThis.internalWorkerTestStore = store;
+  t.after(async () => {
+    delete navigator.locks;
+    delete globalThis.chrome;
+    delete globalThis.internalWorkerTestStore;
+    assert.equal(dirname(await realpath(root)), parent);
+    await rm(root, { recursive: true });
+  });
+
+  const tag = "v" + newVersion;
+  const downloadURL = "https://github.com/" + REPOSITORY + "/releases/download/" + tag + "/";
+  t.mock.method(globalThis, "fetch", async (input) => {
+    const url = new URL(input);
+    if (url.protocol === "chrome-extension:" && url.hostname === extensionId) return new Response(disk.files.get(url.pathname.slice(1)));
+    if (url.href === "https://api.github.com/repos/" + REPOSITORY + "/releases/latest") {
+      return Response.json({ tag_name: tag, assets: [...assets.keys()].map((name, i) => ({ name, id: i + 1, browser_download_url: downloadURL + name })) });
+    }
+    assert.ok(url.href.startsWith(downloadURL));
+    return new Response(assets.get(url.href.slice(downloadURL.length)));
+  });
+
+  async function boot(number) {
+    const dir = join(root, "boot-" + number);
+    await cp(new URL("../extension/", import.meta.url), dir, { recursive: true });
+    await writeFile(join(dir, "store.js"), "export const { load, save, saveAll, record, readEvents } = globalThis.internalWorkerTestStore;\n");
+    await writeFile(join(dir, "active.js"), disk.files.get("active.js"));
+    await import(pathToFileURL(join(dir, "worker.js")));
+  }
+  const command = (kind) => new Promise((resolve) => { assert.equal(receiver({ kind }, sender, resolve), true); });
+
+  await boot(1);
+  const initial = await command("status");
+  assert.equal(receiver({ kind: "apply" }, { id: extensionId, url: "https://example.org/" }, assert.fail), undefined);
+  await command("check");
+  assert.equal((await command("status")).status.phase, "permission-required");
+  assert.equal(state.get("pending").version, newVersion);
+  assert.deepEqual(disk.events, []);
+
+  state.set("directory", copy.directory);
+  await command("apply");
+  assert.equal((await command("status")).status.phase, "folder-required");
+  assert.deepEqual(Object.fromEntries(copy.files), before);
+  assert.deepEqual(copy.events, ["install.json", "install.json"]);
+  assert.equal(reloads, 0);
+
+  state.set("directory", disk.directory);
+  state.set("blocked", null);
+  permission = "granted";
+  await command("folder-ready");
+  assert.equal(reloads, 1);
+  assert.equal(state.get("receipt").status, "written");
+  assert.ok(state.get("recovery"));
+  assert.deepEqual(Object.fromEntries(disk.files), after);
+  await boot(2);
+  const updated = await command("status");
+  assert.notEqual(updated.bootId, initial.bootId);
+  assert.equal(updated.version, newVersion);
+  assert.equal(updated.manifestVersion, newVersion);
+  assert.equal(updated.receipt.status, "executed");
+  assert.equal(state.get("recovery"), null);
+});
 
 async function transaction() {
   const old = await fixtureFiles(oldVersion, { "popup.html": encode("old"), "retired.js": encode("obsolete") });

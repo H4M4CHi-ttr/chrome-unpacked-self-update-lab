@@ -7,11 +7,10 @@
   "host_permissions": [
     "https://api.github.com/*",
     "https://github.com/*",
-    "https://release-assets.githubusercontent.com/*",
-    "https://h4m4chi-ttr.github.io/*"
+    "https://release-assets.githubusercontent.com/*"
   ],
   "background": { "service_worker": "worker.js", "type": "module" },
   "action": { "default_title": "GitHub 自己更新実験", "default_popup": "popup.html" },
-  "externally_connectable": { "matches": ["https://h4m4chi-ttr.github.io/chrome-unpacked-self-update-lab/updater/*"] },
+  "options_ui": { "page": "popup.html", "open_in_tab": true },
   "content_security_policy": { "extension_pages": "script-src 'self'; object-src 'none'; base-uri 'none'" }
 }

@@ -1,5 +1,4 @@
-import { isHash } from "./bridge.js";
-import { equalBytes, namedError, readOwn, sha256, writeExact } from "./core.js";
+import { equalBytes, isHash, namedError, readOwn, sha256, writeExact } from "./core.js";
 
 export const PACKAGE_FORMAT = 2;
 export const PACKAGE_ZIP = "auto-update-https.zip";

@@ -1,0 +1,14 @@
+{
+  "chrome": "Chrome/157.0.8103.79",
+  "profile": "temporary AI Agent (headless)",
+  "signedCandidate": "1.1.0",
+  "repositoryMode": "private with dummy token and loopback release server",
+  "optionsViaAction": true,
+  "verifiedCopyFiles": 16,
+  "copyType": "extension origin-private file system (test setup)",
+  "phase": "folder-required",
+  "backupReleased": true,
+  "actualInstallUnchanged": true,
+  "noHostedUpdaterTab": true,
+  "crossOriginRedirectHasNoCredentials": true
+}

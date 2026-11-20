@@ -5,24 +5,28 @@
 ## 最初に読むファイル
 
 1. [日本語 README](README.ja.MD)：インストールと初回許可、期待する動作、検証結果への入口。
-2. [extension/worker.js](extension/worker.js)：アラーム、署名済み候補の保存、タブ起動、外部 RPC、再読み込みの記録。
-3. [docs/updater/client.js](docs/updater/client.js)：ユーザーのフォルダ選択、許可の復元、書き込み、書き込み後の確認。
-4. [extension/release.js](extension/release.js) と [extension/core.js](extension/core.js)：配信物とフォルダの照合、書き込みと復元。
-5. [移植ガイド](PORTING.md)：自分のリポジトリ、HTTPS オリジン、署名鍵に差し替える手順。作業依頼に使えるプロンプトもあります。
+2. [extension/worker.js](extension/worker.js) はリリース監視、署名済み候補、ディスクへの適用、新版の起動確認を担当します。
+3. [extension/popup.js](extension/popup.js) はポップアップと同梱の設定タブを扱います。フォルダ選択・再許可・手動復元は利用者のクリックから開始します。
+4. [extension/package.js](extension/package.js) と [extension/release.js](extension/release.js) でフォルダと配信物を検証します。
+5. [移植ガイド](PORTING.md) にリポジトリ、同梱ファイル、署名鍵の設定と依頼文の例があります。
 
 ## 更新の境界を保つ
 
-- 拡張機能だけが GitHub Releases を読み、固定した公開鍵で `package-update.json` を検証します。ZIP と各ファイルのハッシュ、パス、配信先、バージョンを照合します。旧版向けの `update.json` は `active.js` だけに使います。
-- HTTPS ページはブラウザでユーザーが選んだハンドルを、そのサイトの IndexedDB に拡張機能 ID ごとに保存します。ハンドルや OS パスをメッセージで渡さないでください。権限のないときは更新を停止し、ユーザー操作のボタンからだけ権限を求めます。
-- 外部メッセージを受ける条件は manifest の externally_connectable と bridge.js の正確なオリジン・パス・トップフレーム・対象 ID です。書き込み先を RPC や ZIP から指定させないでください。
-- `extension/package.js` は管理対象のファイルだけを追加・置換・削除します。バックアップを保存し、Chrome の読み込み元を照合してから書き込みます。`manifest.json` は最後に書き、Chrome が新版を読み込んだと確認できるまで復元用データを残します。権限・拡張機能の識別子・署名鍵・更新ページへの接続設定の変更は、手動で読み込み直す手順に回します。
-- extension/bridge.js、core.js、store.js、package.js を変更したら、node tools/sync-updater.mjs で docs/updater の配信用コピーを更新してください。拡張機能のソースを変更したら node tools/build-release.mjs --refresh-index で install.json を更新してください。
-- 実際のフォルダを壊さないよう、検証は一時 Chrome プロファイルと配布物のコピーで行います。公開リリースや Pages は、変更が明示的に依頼されたときにだけ更新してください。
+- 設定タブは `chrome.runtime.openOptionsPage()` で開きます。ハンドル、トークン、署名済み候補、復元用のバイト列は拡張機能のオリジン内に保存します。外部メッセージや配信ページから書き込み先を指定できる経路を追加しないでください。
+- サービスワーカーは `queryPermission({mode:"readwrite"})` で現在の許可を確認します。許可が必要なら候補を保持し、次にユーザーが設定画面で再許可するまで保留します。
+- 署名、配信先・版・パス・ハッシュ、Chrome の実際の読み込み元を確認します。バックアップ保存後に管理対象だけを変更し、`manifest.json` を最後に書き、新版の起動とパッケージの一致を確認してバックアップを解放します。manifest の権限や署名鍵が変わる場合は手動で新規インストールします。
+- `node tools/build-release.mjs --refresh-index` で同梱ファイルの記録を更新してください。`docs/updater/` は旧版ユーザーの復元にも使用する保存済みのページです。現行版のソースをそこへ同期する工程はありません。
+- 実機試験には一時 Chrome プロファイルと検証用のコピーを使い、公開や配信の変更は明示的な依頼に従ってください。
+
+## プライベートリポジトリに移植する場合
+
+- 配信元を `REPOSITORY` に設定し、プライベートの場合だけ `PRIVATE_REPOSITORY` を `true` にします。対象リポジトリ一つと `Contents: Read-only` に絞った有効期限付きの Fine-grained PAT を、利用者自身が発行して拡張機能のポップアップに登録します。実値を会話で聞いたり、ソース、配布 ZIP、ログに含めたりしないでください。検証にはダミートークンを使います。
+- 認証ヘッダーは固定した GitHub API 宛てのリクエストだけに付け、アセットは API の ID で取得します。GitHub から別オリジンへのリダイレクトにも付け直さないでください。認証付きの配信でも署名とハッシュの検証を維持してください。 [設定手順](PORTING.md#プライベートリポジトリを使う場合)
 
 ## 移植先にデモ用の cron を持ち込まない
 
-`.github/workflows/hourly-demo-release.yml` は、この公開デモの更新を繰り返し試すために、毎時3回起動を試し、公開間隔を60分以上空けてマイナー版を上げます。他の拡張機能へ実装するときは、このワークフローや cron、自動採番をコピーしないでください。移植先では既存のリリース手順に合わせ、明示したタグや承認した公開操作で署名と配信を行ってください。Chrome 側の定期確認は実装の参考にできます。
+この公開デモでは cron-job.org が毎時0分に `.github/workflows/hourly-demo-release.yml` を `workflow_dispatch` で起動し、公開間隔を60分以上空けてマイナー版を上げます。他の拡張機能へ実装するときは、このワークフローや cron、自動採番をコピーしないでください。移植先では既存のリリース手順に合わせ、明示したタグや承認した公開操作で署名と配信を行ってください。Chrome 側の定期確認は実装の参考にできます。
 
 ## 完了判定
 
-node --test tests/*.test.mjs と node tools/sync-updater.mjs --check を実行してください。実機では、更新ページを閉じた状態からの自動起動、選択中のタブを切り替えないこと、既存タブの再利用、Chrome の完全再起動後、許可の取り消し、異なるフォルダを試します。開始時と終了時に active.js の SHA-256、実行版、サービスワーカーの起動 ID を記録してください。再現していない挙動は未検証と明記します。
+変更後は `node --test tests/*.test.mjs` と `node tools/build-release.mjs --check-index` を実行してください。実機では設定タブを閉じた状態でのアラーム、許可が戻ったときの保留と再許可、Chrome 再起動後の挙動を区別してください。署名付き ZIP、実ファイル、manifest の版と新しいワーカーの起動を照合し、実測と未確認事項を記録してください。 [Chrome 157 での拡張機能内更新の実機記録](evidence/internal-update.json)

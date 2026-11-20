@@ -1,0 +1,24 @@
+import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+import { test } from "node:test";
+import { sha256 } from "../extension/core.js";
+import { packageInventory } from "../extension/package.js";
+
+const installed = (file) => readFile(new URL("../extension/" + file, import.meta.url));
+
+test("a fresh installation contains its own settings page and only requests access to release hosts", async () => {
+  const manifest = JSON.parse(await installed("manifest.json"));
+  assert.deepEqual(manifest.permissions, ["alarms"]);
+  assert.equal(manifest.externally_connectable, undefined);
+  assert.deepEqual(manifest.host_permissions.slice().sort(), [
+    "https://api.github.com/*", "https://github.com/*", "https://release-assets.githubusercontent.com/*",
+  ]);
+  assert.equal(manifest.options_ui.open_in_tab, true);
+  const { files } = await packageInventory(await installed("install.json"));
+  const page = manifest.options_ui.page;
+  const html = await installed(page);
+  assert.equal(await sha256(html), files[page]);
+  for (const [, script] of html.toString().matchAll(/<script[^>]+src="([^"]+)"/g)) {
+    assert.equal(await sha256(await installed(script)), files[script]);
+  }
+});

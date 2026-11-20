@@ -14,10 +14,14 @@ h2 { font-size: 19px; margin: 0 0 8px; }
 dl div { display: flex; justify-content: space-between; gap: 15px; padding: 7px 0; border-bottom: 1px solid #d9dee5; }
 dd { margin: 0; font-weight: 600; text-align: right; overflow-wrap: anywhere; }
 .hint { color: #56626e; font-size: 12px; }
+#folder-settings { margin: 18px 0; }
 .actions { display: flex; gap: 8px; flex-wrap: wrap; }
 button { padding: 9px 11px; border: 1px solid #8392a3; border-radius: 4px; background: white; color: inherit; font: inherit; cursor: pointer; }
 button:disabled { opacity: .5; cursor: default; }
 button:focus-visible { outline: 3px solid #3080d8; outline-offset: 2px; }
 #status { white-space: pre-wrap; overflow-wrap: anywhere; padding: 10px 0; }
+#release-access { margin: 12px 0; }
+#release-token-controls { display: grid; gap: 8px; margin: 0; padding: 0; border: 0; min-width: 0; }
+#release-token { width: 100%; padding: 8px; border: 1px solid #8392a3; border-radius: 4px; font: inherit; }
 pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 300px; overflow: auto; font-size: 11px; }
 [hidden] { display: none !important; }

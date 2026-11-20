@@ -2,8 +2,8 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { zipSync } from "../extension/vendor/fflate.js";
 import { compareVersions, fetchLimited, unpackVerified, verifyManifest } from "../extension/release.js";
-import { IMMUTABLE_FILES, equalBytes, replaceActive, restoreRecovery, sha256 } from "../extension/core.js";
-import { PROTOCOL, UPDATER_URL, isAllowedWebSender, isUpdaterTab, isValidMessage, updaterURL } from "../extension/bridge.js";
+import { IMMUTABLE_FILES, equalBytes, replaceActive, restoreRecovery, sha256 } from "../docs/updater/core.js";
+import { PROTOCOL, UPDATER_URL, isAllowedWebSender, isUpdaterTab, isValidMessage, updaterURL } from "../docs/updater/bridge.js";
 import { MAX_CODE_BYTES, REPOSITORY } from "../extension/config.js";
 
 const bytes = (value) => new TextEncoder().encode(value);

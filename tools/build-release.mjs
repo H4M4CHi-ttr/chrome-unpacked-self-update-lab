@@ -3,7 +3,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { createUpdate } from "./create-update.mjs";
 import { REPOSITORY } from "../extension/config.js";
-import { IMMUTABLE_FILES, sha256 } from "../extension/core.js";
+import { sha256 } from "../extension/core.js";
 import {
   PACKAGE_FORMAT, PACKAGE_INDEX, PACKAGE_METADATA, PACKAGE_SIGNATURE, PACKAGE_ZIP,
   decodeJSON, hashFiles, validatePackageVersion,
@@ -12,7 +12,11 @@ import { compareVersions, unpackPackage, verifyPackageManifest } from "../extens
 import { zipSync } from "../extension/vendor/fflate.js";
 
 const extension = new URL("../extension/", import.meta.url);
-const packagePaths = [...IMMUTABLE_FILES.filter((name) => name !== PACKAGE_INDEX), "vendor/LICENSE.fflate", "active.js", "package.js"];
+const packagePaths = [
+  "manifest.json", "poc-identity.json", "popup.html", "popup.css", "popup.js", "worker.js",
+  "core.js", "store.js", "release.js", "config.js", "trust.json", "vendor/fflate.js",
+  "vendor/LICENSE.fflate", "active.js", "package.js",
+];
 const readFiles = async () => Object.fromEntries(await Promise.all(packagePaths.map(async (name) =>
   [name, await readFile(new URL(name, extension))])));
 const json = (value) => Buffer.from(JSON.stringify(value, null, 2) + "\n");
@@ -28,11 +32,14 @@ if (process.argv[2] === "--next") {
   const minor = Number(match[1]) + 1;
   if (minor > 65535) throw new Error("The next minor version would exceed Chrome's manifest limit");
   console.log("v1." + minor + ".0");
-} else if (process.argv[2] === "--refresh-index") {
+} else if (["--refresh-index", "--check-index"].includes(process.argv[2])) {
   const files = await readFiles();
   const { version } = decodeJSON(files["manifest.json"]);
   validatePackageVersion(version);
-  await writeFile(new URL(PACKAGE_INDEX, extension), await installIndex(version, files));
+  const path = new URL(PACKAGE_INDEX, extension);
+  const expected = await installIndex(version, files);
+  if (process.argv[2] === "--refresh-index") await writeFile(path, expected);
+  else if (!(await readFile(path)).equals(expected)) throw new Error("Regenerate extension/install.json with --refresh-index");
 } else {
   const [version, destination] = process.argv.slice(2);
   const privatePEM = process.env.DEMO_SIGNING_KEY_PEM;

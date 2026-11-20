@@ -21,8 +21,13 @@ export function compareVersions(left, right) {
 export async function fetchLimited(url, limit, options = {}) {
   const response = await fetch(url, { credentials: "omit", cache: "no-store", signal: AbortSignal.timeout(20000), ...options });
   if (!response.ok) {
-    const error = namedError("NetworkError", `HTTP ${response.status}: ${new URL(url).hostname}`);
-    if (response.status === 403 || response.status === 429) {
+    const { status } = response;
+    const denied = status === 403 && response.headers.get("x-ratelimit-remaining") !== "0" && !response.headers.has("retry-after");
+    if (options.headers?.Authorization && (status === 401 || status === 404 || denied)) {
+      throw namedError("ReleaseAccessError", `GitHub Releases を取得できません (HTTP ${status})。トークンの有効期限、対象リポジトリの読み取り権限、通常リリースの有無を確認してください。`);
+    }
+    const error = namedError("NetworkError", `HTTP ${status}: ${new URL(url).hostname}`);
+    if (status === 403 || status === 429) {
       const reset = Number(response.headers.get("x-ratelimit-reset")) * 1000;
       error.retryAt = Number.isFinite(reset) && reset > Date.now() ? reset : Date.now() + 15 * 60 * 1000;
     }
@@ -49,8 +54,20 @@ export async function fetchLimited(url, limit, options = {}) {
 
 const decodeJSON = (bytes) => JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes));
 
-export async function latestRelease() {
-  const bytes = await fetchLimited(`https://api.github.com/repos/${REPOSITORY}/releases/latest`, 512 * 1024, { headers: { Accept: "application/vnd.github+json" } });
+const RELEASES_API = `https://api.github.com/repos/${REPOSITORY}/releases`;
+
+function githubHeaders(accept, token) {
+  if (!token) return { Accept: accept };
+  if (typeof token !== "string" || !/^[\x21-\x7e]+$/.test(token)) {
+    throw namedError("ReleaseAccessError", "ポップアップで有効な GitHub アクセストークンを登録してください。");
+  }
+  return { Accept: accept, Authorization: "Bearer " + token };
+}
+
+export async function latestRelease(token) {
+  const bytes = await fetchLimited(RELEASES_API + "/latest", 512 * 1024, {
+    headers: githubHeaders("application/vnd.github+json", token), redirect: token ? "error" : "follow",
+  });
   const release = decodeJSON(bytes);
   if (release.draft || release.prerelease || !Array.isArray(release.assets) || typeof release.tag_name !== "string") throw namedError("ReleaseError", "通常の公開リリースではありません。");
   const version = release.tag_name.replace(/^v/, "");
@@ -58,13 +75,21 @@ export async function latestRelease() {
   return { ...release, version };
 }
 
-function assetURL(release, name) {
+function fetchAsset(release, name, limit, token) {
   const matches = release.assets.filter((asset) => asset.name === name);
   if (matches.length !== 1) throw namedError("ReleaseError", `配信アセットは1個必要です: ${name}`);
-  const url = new URL(matches[0].browser_download_url);
+  const asset = matches[0];
+  if (token) {
+    if (!Number.isSafeInteger(asset.id) || asset.id < 1) throw namedError("ReleaseError", "配信アセットの ID が不正です。");
+    // Fetch removes Authorization when GitHub redirects the download to another origin.
+    return fetchLimited(RELEASES_API + "/assets/" + asset.id, limit, {
+      headers: githubHeaders("application/octet-stream", token), redirect: "follow",
+    });
+  }
+  const url = new URL(asset.browser_download_url);
   const expected = `/${REPOSITORY}/releases/download/${release.tag_name}/${name}`;
   if (url.protocol !== "https:" || url.hostname !== "github.com" || url.pathname !== expected || url.search || url.hash) throw namedError("ReleaseError", "想定外の配信 URL です。");
-  return url.href;
+  return fetchLimited(url.href, limit);
 }
 
 async function verifySignedRelease(raw, signature, publicKey, version, tag) {
@@ -141,9 +166,9 @@ export async function unpackPackage(zip, info) {
   return { format: PACKAGE_FORMAT, version: info.version, tag: info.tag, sha256: sha256sum, files };
 }
 
-export async function downloadPackage(release, publicKey) {
-  const raw = await fetchLimited(assetURL(release, PACKAGE_METADATA), 32 * 1024);
-  const signature = await fetchLimited(assetURL(release, PACKAGE_SIGNATURE), 64);
+export async function downloadPackage(release, publicKey, token) {
+  const raw = await fetchAsset(release, PACKAGE_METADATA, 32 * 1024, token);
+  const signature = await fetchAsset(release, PACKAGE_SIGNATURE, 64, token);
   const info = await verifyPackageManifest(raw, signature, publicKey, release.version, release.tag_name);
-  return unpackPackage(await fetchLimited(assetURL(release, PACKAGE_ZIP), info.zip.bytes), info);
+  return unpackPackage(await fetchAsset(release, PACKAGE_ZIP, info.zip.bytes, token), info);
 }

@@ -1,6 +1,6 @@
 # 自動更新の実測結果
 
-本書は拡張機能が直接書き込んでいた当初の構成の結果です。[権限分離実験](experiments/permission-isolation/RESULTS.md)を経て、現在は GitHub Releases の監視と HTTPS ページの書き込みを統合しています。[現行版の実測](HTTPS-RESULTS.md)を参照してください。
+本書は `active.js` を直接書き換えた初期版の記録です。[権限分離実験](experiments/permission-isolation/RESULTS.md)と[旧 HTTPS 方式](HTTPS-RESULTS.md)も比較しました。拡張機能内でパッケージ一式を更新する現行版の設定は [日本語 README](README.ja.MD) を参照してください。
 
 この環境では、更新の監視・取得・検証・展開はバックグラウンドで自動化できました。書き込み権限が有効な間は、適用と自己再読み込みもアラームだけで完了しました。ただし、画面を閉じた後や自己再読み込み後の権限は `prompt` となりました。初回登録後、常に無操作で更新し続けられることは確認できていません。
 

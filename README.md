@@ -8,19 +8,21 @@ Follow the [demo setup](#try-the-demo) to get started. To adapt the updater to y
 
 ## Try the demo
 
-1. In [Releases](https://github.com/H4M4CHi-ttr/chrome-unpacked-self-update-lab/releases), choose a release with `package-update.json` and `package-update.sig`. Download `auto-update-https.zip` from the same release and extract it to a new folder. Install from this ZIP once when moving from an older setup that only updates `active.js`.
-2. Open `chrome://extensions` and turn on **Developer mode**. Click **Load unpacked** and select the extracted `extension` folder. Open **GitHub 自己更新実験** from the toolbar and check that the extension version (拡張機能のバージョン) matches the release.
-3. In the extension, click **Open HTTPS updater** (HTTPS 更新ページを開く). On that page, click **Choose extension folder** (拡張機能フォルダを選ぶ), select the **same `extension` folder** you loaded in step 2, and grant read and write access. If Chrome offers **Allow on every visit** (サイトアクセス時は常に許可), select it. If it does not appear on the first visit, close and reopen the updater tab, then click **Reauthorize saved folder** (保存したフォルダを再許可) to see whether the option is available. Automatic updates can still run during the current session while Chrome allows writes.
-4. Click **Enable automatic updates** (自動更新を有効にする) and close the setup page. The first check is scheduled about 30 seconds later. The extension then checks every five minutes. To check immediately, click **Check now** (今すぐ確認) in the extension.
-5. When a newer [latest release](https://github.com/H4M4CHi-ttr/chrome-unpacked-self-update-lab/releases/latest) is available, check that the version in `chrome://extensions` has changed and the experiment log (実験ログ) contains `execution-confirmed`. The SHA-256 of each installed file should match its entry in `package-update.json`.
+1. Load the `extension` directory from this checkout, or extract an extension-only release's `auto-update-https.zip` to a new folder. Its manifest declares `options_ui.page` as `popup.html`. The ZIP filename is retained for release compatibility. [Releases](https://github.com/H4M4CHi-ttr/chrome-unpacked-self-update-lab/releases)
+2. Open `chrome://extensions`, enable **Developer mode**, choose **Load unpacked**, and select that `extension` folder.
+3. Open the extension popup and click **Open update settings** (更新設定を開く). The settings tab belongs to the installed extension (`chrome-extension://`). Click **Choose extension folder** (拡張機能フォルダを選ぶ), select the same folder, and grant read and write access to this test copy.
+4. Click **Enable automatic updates** (自動更新を有効にする). The first check runs after about 30 seconds, then every five minutes while Chrome runs. You can also use **Check now** and **Apply downloaded update** from the popup.
+5. When a compatible newer release is available and Chrome grants write access, the worker writes it, reloads the extension, and records `execution-confirmed`. Check the version in `chrome://extensions`. When permission returns to `prompt`, the candidate waits. Use **Reauthorize saved folder** in the extension's settings to continue. Chrome may offer **Allow on every visit** when you revisit a saved folder.
 
-The extension cannot discover its folder on disk automatically, so you need to select it in step 3. Chrome grants the updater site access to the entire folder you choose. Grant this public demo access only to a test copy. If you use a separate Chrome profile, load the extension and grant folder access in that same profile.
+**Migrating from the HTTPS updater.** Finish or restore any interrupted update in the old installation, then stop its monitoring. Load the new extension-only build once and register its folder in the extension. A folder grant belongs to the origin that received it. Remove the old GitHub Pages origin’s file access in Chrome's site controls. The archived Pages client supports older installations.
+
+The public demo requires no GitHub token. When adapting the updater to a private repository, enable private mode and register a read-only, repository-scoped token in the extension popup. [Private repository setup](PORTING.md#プライベートリポジトリを使う場合)
 
 ## Demo release schedule
 
-The GitHub Actions workflow is scheduled at 17, 37, and 57 minutes past each hour. If at least 60 minutes have passed since the latest release was published, the workflow increments the minor version by one and publishes a signed update and a ZIP for fresh installs. If less time has passed, the run exits before building.
+cron-job.org calls `workflow_dispatch` on `main` with `publish=true` at minute zero of each hour in `Asia/Tokyo`. The workflow increments the minor version and publishes signed updates and an install ZIP at least 60 minutes after the previous release. A request within two minutes of that threshold waits until it is reached. Earlier requests exit before building.
 
-The extra slots give the workflow another chance to run if a scheduled run is skipped. GitHub can delay or skip runs during periods of high load. To stop scheduled releases, disable **Hourly demo release** in the Actions tab. [Workflow](.github/workflows/hourly-demo-release.yml) · [GitHub schedule documentation](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#schedule)
+To stop scheduled releases, disable the cron-job.org job. The job uses a fine-grained token scoped to this repository with read and write access to `Actions`. [Workflow](.github/workflows/hourly-demo-release.yml) · [GitHub dispatch API](https://docs.github.com/en/rest/actions/workflows#create-a-workflow-dispatch-event)
 
 When porting this updater, leave out the demo's cron schedule and prepare signed artifacts as part of your own release process. The extension checks for releases every five minutes using a Chrome alarm. [Porting guide](PORTING.md)
 
@@ -28,48 +30,53 @@ Maintainers can use **Run workflow** to build and verify the next version's sign
 
 ## How updates work
 
-1. The service worker checks the latest release and verifies the signature on the file list, the package ZIP hash, and every file in the ZIP.
-2. If automatic updates are enabled and a verified newer version is available, the service worker opens the HTTPS updater in a background tab for that extension ID. If a matching tab already exists, it reuses that tab without switching the active tab.
-3. The updater restores its directory handle from IndexedDB and checks the installed files against the installation record. It saves a backup, proves Chrome is loading from that folder, and applies additions, replacements, and deletions of managed files. It writes `manifest.json` last.
-4. The extension verifies the written package and reloads. The new service worker confirms that Chrome loaded the expected manifest version and that the files match the signed release. The updater keeps the backup until it receives that confirmation.
+1. The extension's service worker checks GitHub Releases, verifies the pinned-key signature on the package metadata, and checks the ZIP and each file against the signed hashes.
+2. The worker reads the folder handle from the extension's IndexedDB and checks the current write permission. With access, it validates the installed files, saves a backup and uses the installation record to confirm the folder Chrome actually loaded. It updates the managed files and writes `manifest.json` last.
+3. The worker reads the files back and calls `chrome.runtime.reload()`. The next worker compares the running code, manifest version and package hash before clearing the backup. The normal update runs with the popup and settings tab closed while Chrome grants access.
 
 The extension runs while Chrome is open. If automatic updates are enabled when Chrome restarts, the extension recreates the alarm if needed and checks for releases at startup. Alarms will not wake a sleeping device, and Chrome may run them later than scheduled. [Chrome alarms API](https://developer.chrome.com/docs/extensions/reference/api/alarms)
 
 ## Troubleshooting the ! badge
 
-If the extension shows a `!`, open the HTTPS updater to find out what happened.
+Open **Update settings** from the popup.
 
-| Status or action | What to do |
+| Situation | Action |
 | --- | --- |
-| Permission required (許可が必要) | Open the HTTPS updater from the extension and click **Reauthorize saved folder** (保存したフォルダを再許可). You only need to do this if access to the folder you chose earlier has been lost. |
-| Choose the folder again (フォルダを選び直す) | Choose the same `extension` folder you loaded in Chrome. |
-| Check an interrupted update (中断した更新を確認) | Open the HTTPS updater to compare the files on disk with the update record. Click **Restore previous version** (中断した更新を旧版に戻す) to restore the previous package and stop checking for updates. Keep the updater URL as a way back if Chrome cannot load the extension. |
-| Stop automatic updates (自動更新を止める) | Click **Stop automatic updates** (自動更新を停止) in the extension. A write that has already started may finish. To revoke the site's permission as well, remove it from the file access settings in Chrome's address bar. |
-
-Once the updater detects that it needs permission again, later checks stop reopening the tab or showing permission dialogs. It detects an identical copy by checking whether a change to the installation record is visible to Chrome. A mismatch triggers recovery before other files are changed. The File System Access API writes one file at a time, so recovery may be needed after an interruption. Recovery does not overwrite other edits it detects. Keep the original ZIP in case the browser data needed for recovery is cleared.
+| Permission required | Reauthorize the saved folder. The worker keeps the signed candidate and asks for permission only through a user action in settings. |
+| Folder mismatch | Select the exact folder Chrome loaded. The updater checks for local edits and restores the installation record if it detects an identical copy. |
+| Interrupted update | Choose **Restore the previous version**. Restoration also stops monitoring. If the extension's own settings cannot start, restore a known-good distribution ZIP manually. Keep this ZIP outside the installation folder. |
+| Stop or disconnect | **Stop automatic updates** stops future checks. **Disconnect folder** also discards the stored handle and pending candidate. An update already in progress may finish first. |
 
 ## Test results
 
-Before reading the implementation, see what each experiment verified. The reports are in Japanese.
+On November 20, 2026 (Japan time), the worker updated a real unpacked installation on Windows 11 and Chrome 157.0.8103.79. With the settings tab closed, two alarms applied `1.0.0 → 1.1.0 → 1.2.0`. After Chrome restarted with the same profile, the extension was still registered and its startup check applied `1.3.0`. Each time, Chrome reported the new manifest version, a fresh worker ran the updated code, and all 16 files on disk matched the signed ZIP byte for byte.
+
+On the first revisit to settings, the saved folder needed one read/write reauthorization. All three subsequent updates ran without another permission prompt. The test used a loopback GitHub Releases fixture, a test P-256 signing key and a 30-second alarm interval. A separate check against the public GitHub release v1.21.0 verified the signature and all 17 files. The extension declined to apply that release because its manifest still requested the old web updater’s host permission. [Extension-only update record](evidence/internal-update.json)
+
+The current worker regression test fetches a signed release, holds it when write access needs a prompt, restores an identical copy selected by mistake, and clears the backup only after a fresh worker confirms the updated version and package hash. It uses test doubles for Chrome APIs and file handles. [Worker test](tests/package.test.mjs)
+
+On Windows, Chrome 157 opened the bundled settings tab from the toolbar action and downloaded a signed candidate. Given an identical copy in the extension’s origin-private file system, the worker detected the folder mismatch, restored the copy and left the installed files intact. The test used a loopback release server and a dummy token. [Chrome folder check](evidence/internal-copy-check.json)
+
+The following reports cover the earlier implementations in real Chrome.
 
 - The HTTPS updater experiment verified alarms, opening and reusing tabs, writing the file on disk, and starting the updated code. [HTTPS updater results](HTTPS-RESULTS.md)
 - In the direct-write experiment, signature verification passed and the folder permission returned to `prompt` after the extension reloaded. [Direct-write experiment](RESULTS.md)
 - The permission isolation experiment recorded what happens after a full Chrome restart when the HTTPS updater has folder access. It also compares this approach with updating the module without reloading the extension. [Permission isolation experiment](experiments/permission-isolation/RESULTS.md)
 
-Automatic updates cover the files in the signed list, including changes to the manifest's version, name, description, and icons. Changes to permissions, extension identity, the signing key, or the updater connection require manually loading a new ZIP. The release still includes `update.zip` for older `active.js`-only installations. Do not use this approach for Chrome Web Store distribution, even with signed releases. [Chrome's guidance on remotely hosted code](https://developer.chrome.com/docs/extensions/develop/migrate/remote-hosted-code)
+Automatic updates cover the files in the signed list, including changes to the manifest's version, name, description, and icons. Changes to permissions, extension identity, the signing key, or the settings entry point require manually loading a new ZIP. The release still includes `update.zip` for older `active.js`-only installations. Do not use this approach for Chrome Web Store distribution, even with signed releases. [Chrome's guidance on remotely hosted code](https://developer.chrome.com/docs/extensions/develop/migrate/remote-hosted-code)
 
-## Tests and updater page sync
+## Tests and installation record
 
 Run these commands with Node.js 22 or later. No additional packages are required.
 
 ~~~powershell
 node --test tests/*.test.mjs
-node tools/sync-updater.mjs --check
+node tools/build-release.mjs --check-index
 node tools/verify-live-evidence.mjs
 node tools/verify-isolation-evidence.mjs
 node tools/verify-https-evidence.mjs
 ~~~
 
-Run `node tools/sync-updater.mjs` after changing files shared by the extension and the HTTPS updater. Before loading the source checkout in Chrome, run `node tools/build-release.mjs --refresh-index` to record the hashes of the current extension files. Use a separate folder for testing. Sign packages with `build-release.mjs` as described in the [porting guide](PORTING.md). The older `build-fixtures.mjs` script replaces the seed code and public key and is only for reproducing the old experiment.
+Before loading the source checkout in Chrome, run `node tools/build-release.mjs --refresh-index` to record the hashes of the current extension files. Use a separate folder for testing. Sign packages with `build-release.mjs` as described in the [porting guide](PORTING.md). The older `build-fixtures.mjs` script replaces the seed code and public key and is only for reproducing the old experiment.
 
 The demo uses the bundled fflate 0.8.3 for ZIP processing. [MIT license](extension/vendor/LICENSE.fflate)
