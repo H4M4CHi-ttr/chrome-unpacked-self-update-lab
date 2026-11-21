@@ -4,14 +4,11 @@ import { load, record, saveAll } from "./store.js";
 
 const $ = (selector) => document.querySelector(selector);
 const labels = {
-  ready: "更新設定でフォルダを登録して、自動更新を有効にできます。",
-  monitoring: "GitHub Releases を定期確認しています。",
+  monitoring: "Chrome の起動中は新しいリリースを定期的に確認します。",
   "up-to-date": "新しいリリースはありません。",
   "package-unavailable": "最新リリースに全体更新用の署名済みパッケージがありません。",
   downloaded: "検証済みの更新があります。「取得済みの更新を適用」で更新できます。",
-  "permission-required": "更新を保留しています。更新設定でフォルダを登録するか、保存したフォルダを再許可してください。",
-  "folder-required": "更新設定で、Chrome に読み込んだフォルダを選び直してください。",
-  "recovery-required": "中断した更新があります。更新設定から旧版に復元できます。",
+  "permission-required": "更新を保留しました。",
   reloading: "書き込みを確認しました。拡張機能を再読み込みしています。",
   updated: "新しいコードの起動を確認しました。",
   restored: "旧版を復元し、自動更新を停止しました。",
@@ -22,6 +19,7 @@ const controls = ["pick", "grant", "enable", "forget", "restore", "check", "disa
 const fullPage = Boolean(await chrome.tabs.getCurrent());
 document.body.classList.toggle("tab", fullPage);
 $("#folder-settings").hidden = !fullPage;
+$("#version-details").open = !fullPage;
 $("#updater").hidden = fullPage;
 $("#updater").onclick = () => { void chrome.runtime.openOptionsPage().catch(showError); };
 
@@ -39,38 +37,74 @@ function showError(error) {
 async function refresh() {
   [directory, backup] = await Promise.all([load("directory"), load("recovery")]);
   const perm = directory ? await directory.queryPermission({ mode: "readwrite" }) : "not-selected";
+  const state = await send("status");
+  const needsFolder = !directory || state.status?.phase === "folder-required";
+  const needsGrant = !needsFolder && perm !== "granted";
+  let guide = "";
+  if (backup) guide = "中断した更新を、設定画面で旧版に戻してください。";
+  else if (needsFolder) guide = "Chrome に読み込んだときと同じフォルダを選び、読み書きを許可してください。";
+  else if (needsGrant) guide = "保存したフォルダへの読み書きを再許可してください。";
+  if (guide && !backup && state.enableOnFirstGrant) {
+    guide += "\n許可すると自動更新がオンになります。あとから停止できます。";
+  }
+  $("#folder-guide").textContent = guide;
+  $("#updater").classList.toggle("primary", Boolean(guide));
+
   const permissionText = { granted: "許可あり", prompt: "再許可が必要", denied: "拒否", "not-selected": "未登録" };
-  $("#permission").textContent = (permissionText[perm] ?? perm) + (directory ? " / " + directory.name : "");
+  $("#permission").textContent = (permissionText[perm] ?? perm) + (directory ? "（" + directory.name + "）" : "");
+  $("#pick").textContent = directory ? "フォルダを選び直す" : "拡張機能フォルダを選ぶ";
+  $("#pick").classList.toggle("primary", needsFolder);
+  $("#pick").hidden = Boolean(backup);
   $("#pick").disabled = busy || Boolean(backup);
-  $("#grant").disabled = busy || !directory || perm === "granted" || Boolean(backup);
+  $("#grant").hidden = !needsGrant || Boolean(backup);
+  $("#grant").disabled = busy || !needsGrant || Boolean(backup);
+  $("#forget").hidden = !directory || Boolean(backup);
   $("#forget").disabled = busy || !directory || Boolean(backup);
   $("#restore").hidden = !backup;
   $("#restore").disabled = busy || !backup;
 
-  const state = await send("status");
+  let enabledLabel = state.enableOnFirstGrant ? "未設定" : "オフ";
+  if (state.enabled) {
+    enabledLabel = "オン";
+    if (needsFolder) enabledLabel = "フォルダの確認待ち";
+    else if (needsGrant) enabledLabel = "再許可待ち";
+  }
+  $("#enabled").textContent = backup ? "復元待ち" : enabledLabel;
   $("#manifest-version").textContent = state.manifestVersion;
-  $("#enabled").textContent = state.enabled ? "有効" : "停止中";
-  $("#interval").textContent = state.alarm?.periodInMinutes ? (state.alarm.periodInMinutes * 60) + " 秒" : "停止中";
+  $("#interval").textContent = state.alarm?.periodInMinutes ? state.alarm.periodInMinutes + " 分" : "停止中";
   $("#pending").textContent = state.pending ?? "なし";
-  $("#enable").disabled = busy || perm !== "granted" || Boolean(backup) || state.enabled;
+  $("#enable").hidden = !directory || state.enabled || Boolean(backup);
+  $("#enable").disabled = busy || needsFolder || needsGrant || Boolean(backup) || state.enabled;
+  $("#disable").hidden = !state.enabled;
   $("#disable").disabled = busy || !state.enabled;
   $("#check").disabled = busy || Boolean(backup);
-  $("#apply").disabled = busy || !state.pending || perm !== "granted" || Boolean(backup);
+  $("#apply").hidden = !state.pending;
+  $("#apply").disabled = busy || !state.pending || needsFolder || needsGrant || Boolean(backup);
+
   const detail = state.status?.message;
   const label = labels[state.status?.phase] ?? "";
-  $("#status").textContent = localError || [label, detail].filter(Boolean).join("\n");
+  const message = localError || [label, detail].filter(Boolean).join("\n");
+  if ($("#status").textContent !== message) $("#status").textContent = message;
   $("#events").textContent = state.events.map((event) => JSON.stringify(event)).join("\n");
 }
 
 function action(id, task) {
-  $("#" + id).onclick = async () => {
+  const button = $("#" + id);
+  button.onclick = async () => {
     if (busy) return;
+    const wasFocused = document.activeElement === button;
     busy = true;
     localError = "";
     for (const control of controls) $("#" + control).disabled = true;
     try { await task(); }
     catch (error) { showError(error); }
-    finally { busy = false; await refresh().catch(showError); }
+    finally {
+      busy = false;
+      await refresh().catch(showError);
+      if (wasFocused && document.activeElement === document.body) {
+        (button.hidden || button.disabled ? $("#settings-title") : button).focus();
+      }
+    }
   };
 }
 

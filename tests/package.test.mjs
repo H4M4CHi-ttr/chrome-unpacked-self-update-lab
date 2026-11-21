@@ -197,9 +197,9 @@ test("the internal worker holds a signed update, protects an identical copy and 
   const { raw, signature, zip } = await signedPackage(after, { keyPair });
   const assets = new Map([["package-update.json", raw], ["package-update.sig", signature], ["auto-update-https.zip", zip]]);
   const disk = fakeDirectory(before), copy = fakeDirectory(before);
-  let permission = "prompt", reloads = 0, receiver, alarm;
+  let permission = "prompt", reloads = 0, optionsOpened = 0, receiver, alarm, onInstalled;
   disk.directory.queryPermission = async () => permission;
-  const state = new Map([["directory", disk.directory], ["enabled", true]]);
+  const state = new Map();
   const events = [];
   const store = {
     load: async (key) => state.get(key),
@@ -216,6 +216,8 @@ test("the internal worker holds a signed update, protects an identical copy and 
       id: extensionId, getURL: ownURL, getManifest: () => JSON.parse(new TextDecoder().decode(disk.files.get("manifest.json"))),
       reload: () => { reloads++; }, onMessage: { addListener: (fn) => { receiver = fn; } },
       onStartup: { addListener() {} },
+      onInstalled: { addListener: (listener) => { onInstalled = listener; } },
+      openOptionsPage: async () => { optionsOpened++; },
     },
     action: { async setBadgeText() {} },
     alarms: {
@@ -262,6 +264,31 @@ test("the internal worker holds a signed update, protects an identical copy and 
 
   await boot(1);
   const initial = await command("status");
+  assert.equal(typeof onInstalled, "function");
+  for (const reason of ["update", "chrome_update"]) onInstalled({ reason });
+  assert.equal(optionsOpened, 0);
+  onInstalled({ reason: "install" });
+  assert.equal(optionsOpened, 1);
+
+  await command("folder-ready");
+  assert.equal((await command("status")).enabled, false);
+  assert.ok(!alarm);
+  state.set("directory", disk.directory);
+  await command("folder-ready");
+  assert.equal((await command("status")).enabled, false);
+  assert.ok(!alarm);
+
+  permission = "granted";
+  await command("folder-ready");
+  assert.equal((await command("status")).enabled, true);
+  assert.equal(alarm.delayInMinutes, 0.5);
+  await command("disable");
+  await command("folder-ready");
+  assert.equal((await command("status")).enabled, false);
+  assert.ok(!alarm);
+
+  await command("enable");
+  permission = "prompt";
   assert.equal(receiver({ kind: "apply" }, { id: extensionId, url: "https://example.org/" }, assert.fail), undefined);
   await command("check");
   assert.equal((await command("status")).status.phase, "permission-required");
@@ -284,6 +311,8 @@ test("the internal worker holds a signed update, protects an identical copy and 
   assert.ok(state.get("recovery"));
   assert.deepEqual(Object.fromEntries(disk.files), after);
   await boot(2);
+  onInstalled({ reason: "update" });
+  assert.equal(optionsOpened, 1);
   const updated = await command("status");
   assert.notEqual(updated.bootId, initial.bootId);
   assert.equal(updated.version, newVersion);

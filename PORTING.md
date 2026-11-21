@@ -39,7 +39,7 @@ Chrome の開発者モードで配布する拡張機能を対象に、拡張機�
 ~~~powershell
 # 保存先は公開リポジトリ外の、自分だけが読める既存ディレクトリ
 openssl genpkey -algorithm EC -pkeyopt ec_paramgen_curve:prime256v1 -out <秘密ディレクトリ>/updates.pem
-node tools/create-update.mjs 1.0.0 extension/active.js <秘密ディレクトリ>/updates.pem <空きパス>/seed
+node tools/create-update.mjs 2.0.0 extension/active.js <秘密ディレクトリ>/updates.pem <空きパス>/seed
 ~~~
 
 初回は生成した `trust.json` を `extension` にコピーします。`create-update.mjs` が作るほかのファイルは旧方式用です。パッケージ全体に署名するには `build-release.mjs` を使います。次のリリースでも同じ鍵を使い、配信するバージョンをコマンドに指定します。
@@ -47,19 +47,19 @@ node tools/create-update.mjs 1.0.0 extension/active.js <秘密ディレクトリ
 ~~~powershell
 $env:DEMO_SIGNING_KEY_PEM = Get-Content -Raw -LiteralPath '<秘密ディレクトリ>/updates.pem'
 try {
-  node tools/build-release.mjs 1.1.0 '<空きパス>/v1.1.0'
+  node tools/build-release.mjs 2.0.1 '<空きパス>/v2.0.1'
   if ($LASTEXITCODE -ne 0) { throw 'Release build failed' }
 } finally {
   Remove-Item Env:DEMO_SIGNING_KEY_PEM
 }
-gh release create v1.1.0 '<空きパス>/v1.1.0/auto-update-https.zip' '<空きパス>/v1.1.0/package-update.json' '<空きパス>/v1.1.0/package-update.sig' --latest
+gh release create v2.0.1 '<空きパス>/v2.0.1/auto-update-https.zip' '<空きパス>/v2.0.1/package-update.json' '<空きパス>/v2.0.1/package-update.sig' --latest
 ~~~
 
 上のコマンドの <> 部分は実際のパスに置き換えてください。アセットをそろえてから通常リリースとして公開します。下書きとプレリリースは latest の対象外です。秘密鍵は配信者が管理し、コミットや公開アセット、エージェントの出力に含めないでください。自分の拡張機能は、自分の公開鍵を固定した初期版から始めます。鍵を切り替えるときは、新しい公開鍵を同梱した ZIP を再配布します。
 
 ## cron はデモ専用。移植先は公開する版を明示する
 
-このリポジトリでは、実験用の版を作るため cron-job.org から GitHub Actions を毎時起動します。AI エージェントは、この定期起動や自動の版上げを移植しないでください。運用先では、レビュー済みのタグを作るときや明示的な公開操作を起点に、署名と配信を実行します。拡張機能が Releases を定期確認する処理は移植できます。
+このリポジトリでは、実験用の版を作るため cron-job.org から GitHub Actions を毎時起動します。2 系は `v2.0.0` から配信し、定期公開ではパッチ番号を1ずつ上げます。AI エージェントは、この定期起動や自動の版上げを移植しないでください。運用先では、レビュー済みのタグを作るときや明示的な公開操作を起点に、署名と配信を実行します。拡張機能が Releases を定期確認する処理は移植できます。
 
 ## AI エージェントへ渡す依頼の例
 

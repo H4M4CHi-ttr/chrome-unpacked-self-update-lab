@@ -184,15 +184,21 @@ function automaticCheck(reason) {
 }
 chrome.alarms.onAlarm.addListener((alarm) => { if (alarm.name === CHECK_ALARM) automaticCheck("alarm"); });
 chrome.runtime.onStartup.addListener(() => automaticCheck("browser-startup"));
+chrome.runtime.onInstalled.addListener(({ reason }) => {
+  if (reason === "install") void chrome.runtime.openOptionsPage().catch(console.error);
+});
 void run(start, "startup").catch(console.error);
 
 async function command(kind) {
   switch (kind) {
-    case "status": return {
-      version, manifestVersion, bootId, enabled: Boolean(await load("enabled")), pending: (await load("pending"))?.version ?? null,
-      receipt: await load("receipt"), status: await load("status"), alarm: await chrome.alarms.get(CHECK_ALARM),
-      events: (await readEvents()).slice(-50),
-    };
+    case "status": {
+      const enabled = await load("enabled");
+      return {
+        version, manifestVersion, bootId, enabled: Boolean(enabled), enableOnFirstGrant: enabled === undefined,
+        pending: (await load("pending"))?.version ?? null, receipt: await load("receipt"),
+        status: await load("status"), alarm: await chrome.alarms.get(CHECK_ALARM), events: (await readEvents()).slice(-50),
+      };
+    }
     case "enable":
       if (await load("recovery") || await load("blocked") || await permissionOf(await load("directory")) !== "granted") {
         throw namedError("NotAllowedError", "先にフォルダの登録・再許可または復元を完了してください。");
@@ -209,10 +215,18 @@ async function command(kind) {
       return true;
     case "check": await check("manual-check"); return true;
     case "apply": await applyPending("manual-apply"); return true;
-    case "folder-ready":
-      if (await load("enabled") && await load("pending")) await applyPending("folder-ready");
-      else if (!await load("recovery")) await status(await load("enabled") ? "monitoring" : "ready");
+    case "folder-ready": {
+      if (await load("recovery")) return true;
+      let enabled = await load("enabled");
+      if (enabled === undefined && !await load("blocked") && await permissionOf(await load("directory")) === "granted") {
+        enabled = true;
+        await save("enabled", enabled);
+        await ensureAlarm();
+      }
+      if (enabled && await load("pending")) await applyPending("folder-ready");
+      else await status(enabled ? "monitoring" : "ready");
       return true;
+    }
     default: throw namedError("ProtocolError", "未対応の操作です。");
   }
 }

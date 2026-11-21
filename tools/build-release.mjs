@@ -27,11 +27,17 @@ async function installIndex(version, files) {
 }
 
 if (process.argv[2] === "--next") {
-  const match = /^v1\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.exec(process.argv[3] ?? "");
-  if (!match) throw new Error("The latest release must be on the v1.x demo series");
-  const minor = Number(match[1]) + 1;
-  if (minor > 65535) throw new Error("The next minor version would exceed Chrome's manifest limit");
-  console.log("v1." + minor + ".0");
+  const tag = process.argv[3] ?? "";
+  if (!tag.startsWith("v")) throw new Error("The latest release tag must start with v");
+  const latest = tag.slice(1);
+  validatePackageVersion(latest);
+  const { version: baseline } = decodeJSON(await readFile(new URL("manifest.json", extension)));
+  validatePackageVersion(baseline);
+
+  const [major, minor, patch] = latest.split(".").map(Number);
+  const next = compareVersions(latest, baseline) < 0 ? baseline : [major, minor, patch + 1].join(".");
+  validatePackageVersion(next);
+  console.log("v" + next);
 } else if (["--refresh-index", "--check-index"].includes(process.argv[2])) {
   const files = await readFiles();
   const { version } = decodeJSON(files["manifest.json"]);

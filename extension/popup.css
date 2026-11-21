@@ -4,7 +4,6 @@ body { margin: 0; width: 450px; }
 body.tab { width: auto; }
 main { padding: 20px; }
 .tab main { max-width: 760px; margin: 20px auto; }
-header span { font-size: 10px; letter-spacing: .08em; color: #596575; }
 h1 { font-size: 24px; margin: 5px 0 18px; }
 #demo { padding: 18px; background: #e7eaf0; border-left: 5px solid #596575; }
 #demo[data-source="A"] { background: #dff4e5; border-color: #187239; }
@@ -14,12 +13,19 @@ h2 { font-size: 19px; margin: 0 0 8px; }
 dl div { display: flex; justify-content: space-between; gap: 15px; padding: 7px 0; border-bottom: 1px solid #d9dee5; }
 dd { margin: 0; font-weight: 600; text-align: right; overflow-wrap: anywhere; }
 .hint { color: #56626e; font-size: 12px; }
-#folder-settings { margin: 18px 0; }
+#update-panel { margin-bottom: 16px; padding: 16px; background: white; border: 1px solid #d9dee5; border-radius: 4px; }
+#folder-guide { margin: 0 0 12px; white-space: pre-line; }
+#update-state { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 12px 0; }
+#update-state div { display: block; padding: 8px; background: #f5f6f8; border: 0; border-radius: 4px; }
+#update-state dt { font-size: 12px; color: #56626e; }
+#update-state dd { margin-top: 2px; text-align: left; }
 .actions { display: flex; gap: 8px; flex-wrap: wrap; }
 button { padding: 9px 11px; border: 1px solid #8392a3; border-radius: 4px; background: white; color: inherit; font: inherit; cursor: pointer; }
+button.primary { background: #184f70; border-color: #184f70; color: white; }
 button:disabled { opacity: .5; cursor: default; }
 button:focus-visible { outline: 3px solid #3080d8; outline-offset: 2px; }
-#status { white-space: pre-wrap; overflow-wrap: anywhere; padding: 10px 0; }
+#status { margin: 12px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+#status:empty, #folder-guide:empty { display: none; }
 #release-access { margin: 12px 0; }
 #release-token-controls { display: grid; gap: 8px; margin: 0; padding: 0; border: 0; min-width: 0; }
 #release-token { width: 100%; padding: 8px; border: 1px solid #8392a3; border-radius: 4px; font: inherit; }

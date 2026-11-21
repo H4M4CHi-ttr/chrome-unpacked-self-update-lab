@@ -63,7 +63,7 @@ jobs:
         run: |
           node --test tests/*.test.mjs
           node tools/build-release.mjs --check-index
-      - name: Calculate next version from the latest published release
+      - name: Select the release baseline or next patch
         id: version
         if: steps.cadence.outputs.latest != ''
         env:
@@ -99,4 +99,4 @@ jobs:
             "$RUNNER_TEMP/demo-release/update.json" "$RUNNER_TEMP/demo-release/update.sig" \
             "$RUNNER_TEMP/demo-release/package-update.json" "$RUNNER_TEMP/demo-release/package-update.sig" \
             --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "$TAG" --latest \
-            --notes "拡張機能内の「更新設定」でフォルダを登録すると、署名付きリリースを適用できます。旧 HTTPS 更新ページ版からの移行には、この ZIP を展開して手動で読み込み、フォルダを登録してください。"
+            --notes "初回インストールで「更新設定」が開きます。フォルダを照合し、書き込みを許可すると自動更新がオンになります。拡張機能内で更新する 1 系からは、これまでの自動更新で移行できます。旧 HTTPS 更新ページ版を使っている場合は、この ZIP を展開して手動で読み込み、フォルダを登録してください。"

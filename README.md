@@ -10,9 +10,11 @@ Follow the [demo setup](#try-the-demo) to get started. To adapt the updater to y
 
 1. Load the `extension` directory from this checkout, or extract an extension-only release's `auto-update-https.zip` to a new folder. Its manifest declares `options_ui.page` as `popup.html`. The ZIP filename is retained for release compatibility. [Releases](https://github.com/H4M4CHi-ttr/chrome-unpacked-self-update-lab/releases)
 2. Open `chrome://extensions`, enable **Developer mode**, choose **Load unpacked**, and select that `extension` folder.
-3. Open the extension popup and click **Open update settings** (更新設定を開く). The settings tab belongs to the installed extension (`chrome-extension://`). Click **Choose extension folder** (拡張機能フォルダを選ぶ), select the same folder, and grant read and write access to this test copy.
-4. Click **Enable automatic updates** (自動更新を有効にする). The first check runs after about 30 seconds, then every five minutes while Chrome runs. You can also use **Check now** and **Apply downloaded update** from the popup.
+3. On first install, the extension opens its update settings. Click **Choose extension folder** (拡張機能フォルダを選ぶ), select the same folder, and grant read and write access to this test copy. To return to the tab, use **Open update settings** (更新設定を開く) from the popup.
+4. Automatic updates start once the extension verifies the folder and has write access. The first check runs after about 30 seconds, then every five minutes while Chrome runs. Use **Stop automatic updates** to turn this off. The extension remembers your choice when you reauthorize the folder.
 5. When a compatible newer release is available and Chrome grants write access, the worker writes it, reloads the extension, and records `execution-confirmed`. Check the version in `chrome://extensions`. When permission returns to `prompt`, the candidate waits. Use **Reauthorize saved folder** in the extension's settings to continue. Chrome may offer **Allow on every visit** when you revisit a saved folder.
+
+Extension-only 1.x builds (`v1.22.0` and later) can update to 2.x through the existing automatic updater when it is enabled and the folder is writable.
 
 **Migrating from the HTTPS updater.** Finish or restore any interrupted update in the old installation, then stop its monitoring. Load the new extension-only build once and register its folder in the extension. A folder grant belongs to the origin that received it. Remove the old GitHub Pages origin’s file access in Chrome's site controls. The archived Pages client supports older installations.
 
@@ -20,7 +22,7 @@ The public demo requires no GitHub token. When adapting the updater to a private
 
 ## Demo release schedule
 
-cron-job.org calls `workflow_dispatch` on `main` with `publish=true` at minute zero of each hour in `Asia/Tokyo`. The workflow increments the minor version and publishes signed updates and an install ZIP at least 60 minutes after the previous release. A request within two minutes of that threshold waits until it is reached. Earlier requests exit before building.
+cron-job.org calls `workflow_dispatch` on `main` with `publish=true` at minute zero of each hour in `Asia/Tokyo`. The 2.x series starts at `v2.0.0` and advances one patch at a time, for example `v2.0.1` and `v2.0.2`. The workflow publishes signed updates and an install ZIP at least 60 minutes after the previous release. A request within two minutes of that threshold waits until it is reached. Earlier requests exit before building.
 
 To stop scheduled releases, disable the cron-job.org job. The job uses a fine-grained token scoped to this repository with read and write access to `Actions`. [Workflow](.github/workflows/hourly-demo-release.yml) · [GitHub dispatch API](https://docs.github.com/en/rest/actions/workflows#create-a-workflow-dispatch-event)
 
