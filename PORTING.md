@@ -18,7 +18,7 @@ Chrome の開発者モードで配布する拡張機能を対象に、拡張機�
 | `extension/poc-identity.json`、`trust.json` | 移植先の識別情報とリリース署名用の公開鍵 |
 | `tools/build-release.mjs` | `packagePaths` に同梱ファイルを登録し、`--refresh-index` でインストール記録を再生成 |
 
-ハンドルと更新中のバックアップは拡張機能の IndexedDB に保存します。ファイル選択と再許可はクリック直後に設定画面から呼びます。サービスワーカーは現在の許可を確認し、書き込めないときは候補を保留します。検証済みの候補と書き込み先は拡張機能内で扱います。外部向けメッセージ受付や、更新設定をホストする Web サイトは不要です。
+ハンドルと更新中のバックアップは拡張機能の IndexedDB に保存します。ファイル選択と再許可はクリック直後に設定画面から呼びます。サービスワーカーは現在の書き込み許可を確認します。自動更新がオンで再許可が必要な場合は、設定タブを一度だけ前面に出し、利用者の操作まで更新候補を保留します。許可待ちを記録して、定期確認や Chrome の再起動で同じ設定タブを繰り返し前面に出すのを防ぎます。検証済みの候補と書き込み先は拡張機能内で扱います。外部向けメッセージ受付や、更新設定をホストする Web サイトは不要です。
 
 旧 HTTPS 版からの移行では、旧版の復元作業を終えて監視を停止し、新版を一度手動で読み込んでフォルダを登録します。Chrome のサイト設定で旧サイトへのフォルダ許可を取り消してください。`docs/updater/` は公開済みの旧クライアント専用です。
 
@@ -39,7 +39,7 @@ Chrome の開発者モードで配布する拡張機能を対象に、拡張機�
 ~~~powershell
 # 保存先は公開リポジトリ外の、自分だけが読める既存ディレクトリ
 openssl genpkey -algorithm EC -pkeyopt ec_paramgen_curve:prime256v1 -out <秘密ディレクトリ>/updates.pem
-node tools/create-update.mjs 2.0.0 extension/active.js <秘密ディレクトリ>/updates.pem <空きパス>/seed
+node tools/create-update.mjs 2.1.0 extension/active.js <秘密ディレクトリ>/updates.pem <空きパス>/seed
 ~~~
 
 初回は生成した `trust.json` を `extension` にコピーします。`create-update.mjs` が作るほかのファイルは旧方式用です。パッケージ全体に署名するには `build-release.mjs` を使います。次のリリースでも同じ鍵を使い、配信するバージョンをコマンドに指定します。
@@ -47,22 +47,22 @@ node tools/create-update.mjs 2.0.0 extension/active.js <秘密ディレクトリ
 ~~~powershell
 $env:DEMO_SIGNING_KEY_PEM = Get-Content -Raw -LiteralPath '<秘密ディレクトリ>/updates.pem'
 try {
-  node tools/build-release.mjs 2.0.1 '<空きパス>/v2.0.1'
+  node tools/build-release.mjs 2.1.1 '<空きパス>/v2.1.1'
   if ($LASTEXITCODE -ne 0) { throw 'Release build failed' }
 } finally {
   Remove-Item Env:DEMO_SIGNING_KEY_PEM
 }
-gh release create v2.0.1 '<空きパス>/v2.0.1/auto-update-https.zip' '<空きパス>/v2.0.1/package-update.json' '<空きパス>/v2.0.1/package-update.sig' --latest
+gh release create v2.1.1 '<空きパス>/v2.1.1/auto-update-https.zip' '<空きパス>/v2.1.1/package-update.json' '<空きパス>/v2.1.1/package-update.sig' --latest
 ~~~
 
 上のコマンドの <> 部分は実際のパスに置き換えてください。アセットをそろえてから通常リリースとして公開します。下書きとプレリリースは latest の対象外です。秘密鍵は配信者が管理し、コミットや公開アセット、エージェントの出力に含めないでください。自分の拡張機能は、自分の公開鍵を固定した初期版から始めます。鍵を切り替えるときは、新しい公開鍵を同梱した ZIP を再配布します。
 
 ## cron はデモ専用。移植先は公開する版を明示する
 
-このリポジトリでは、実験用の版を作るため cron-job.org から GitHub Actions を毎時起動します。2 系は `v2.0.0` から配信し、定期公開ではパッチ番号を1ずつ上げます。AI エージェントは、この定期起動や自動の版上げを移植しないでください。運用先では、レビュー済みのタグを作るときや明示的な公開操作を起点に、署名と配信を実行します。拡張機能が Releases を定期確認する処理は移植できます。
+このリポジトリでは、実験用の版を作るため cron-job.org から GitHub Actions を毎時起動します。現在の公開基準は `v2.1.0` で、定期公開ではパッチ番号を1ずつ上げます。AI エージェントは、この定期起動や自動の版上げを移植しないでください。運用先では、レビュー済みのタグを作るときや明示的な公開操作を起点に、署名と配信を実行します。拡張機能が Releases を定期確認する処理は移植できます。
 
 ## AI エージェントへ渡す依頼の例
 
-> このリポジトリの AGENTS.md と PORTING.md を読み、開発者モードで読み込む私の拡張機能に自動更新を追加してください。既存の権限と配信対象のファイルを調べ、署名とファイルのハッシュを検証してから、初回に私が拡張機能の設定タブで許可したフォルダへ、サービスワーカーから更新を適用してください。許可が必要なときは候補を保留してください。再読み込み後は manifest のバージョンと新版の実行を確認し、途中で止まったらバックアップから復元できるようにしてください。プライベート配信の場合だけ、最小権限のトークンを利用者がポップアップに登録できるようにしてください。毎時リリースの cron は移植せず、既存の公開手順を使ってください。トークンや秘密鍵を表示せず、公開作業は別途指示があるまで行わないでください。未検証の条件も報告してください。
+> このリポジトリの AGENTS.md と PORTING.md を読み、開発者モードで読み込む私の拡張機能に自動更新を追加してください。既存の権限と配信対象のファイルを調べ、署名とファイルのハッシュを検証してから、初回に私が拡張機能の設定タブで許可したフォルダへ、サービスワーカーから更新を適用してください。自動更新がオンで再許可が必要なときは、設定タブを一度だけ前面に出し、利用者が再許可するまで候補を保留してください。再読み込み後は manifest のバージョンと新版の実行を確認し、途中で止まったらバックアップから復元できるようにしてください。プライベート配信の場合だけ、最小権限のトークンを利用者がポップアップに登録できるようにしてください。毎時リリースの cron は移植せず、既存の公開手順を使ってください。トークンや秘密鍵を表示せず、公開作業は別途指示があるまで行わないでください。未検証の条件も報告してください。
 
 追加の確認先: [Chrome の永続的なファイル権限](https://developer.chrome.com/blog/persistent-permissions-for-the-file-system-access-api)、[拡張機能のオプションページ](https://developer.chrome.com/docs/extensions/develop/ui/options-page)、[GitHub Releases API](https://docs.github.com/en/rest/releases/releases#get-the-latest-release)。

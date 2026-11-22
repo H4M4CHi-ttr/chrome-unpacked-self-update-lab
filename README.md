@@ -11,10 +11,11 @@ Follow the [demo setup](#try-the-demo) to get started. To adapt the updater to y
 1. Load the `extension` directory from this checkout, or extract an extension-only release's `auto-update-https.zip` to a new folder. Its manifest declares `options_ui.page` as `popup.html`. The ZIP filename is retained for release compatibility. [Releases](https://github.com/H4M4CHi-ttr/chrome-unpacked-self-update-lab/releases)
 2. Open `chrome://extensions`, enable **Developer mode**, choose **Load unpacked**, and select that `extension` folder.
 3. On first install, the extension opens its update settings. Click **Choose extension folder** (拡張機能フォルダを選ぶ), select the same folder, and grant read and write access to this test copy. To return to the tab, use **Open update settings** (更新設定を開く) from the popup.
-4. Automatic updates start once the extension verifies the folder and has write access. The first check runs after about 30 seconds, then every five minutes while Chrome runs. Use **Stop automatic updates** to turn this off. The extension remembers your choice when you reauthorize the folder.
-5. When a compatible newer release is available and Chrome grants write access, the worker writes it, reloads the extension, and records `execution-confirmed`. Check the version in `chrome://extensions`. When permission returns to `prompt`, the candidate waits. Use **Reauthorize saved folder** in the extension's settings to continue. Chrome may offer **Allow on every visit** when you revisit a saved folder.
+4. Automatic updates start once the extension verifies the folder and has write access. If a later check finds that write access needs to be renewed, the extension brings its update settings to the front once. Click **Reauthorize saved folder** (保存したフォルダを再許可) and choose **Allow on every visit** (サイトアクセス時は常に許可) if Chrome offers it.
+5. If you close the settings tab, the **!** badge will stay while write access is needed. In the popup, use **Open reauthorization** (再許可画面を開く) to return to settings. The extension reuses the folder you registered.
+6. The first update check runs after about 30 seconds, then every five minutes while Chrome runs. After a compatible update is applied, check the version in `chrome://extensions` and look for `execution-confirmed` in the experiment log. Use **Stop automatic updates** to turn updates off. The extension remembers this choice when you reauthorize the folder.
 
-Extension-only 1.x builds (`v1.22.0` and later) can update to 2.x through the existing automatic updater when it is enabled and the folder is writable.
+Installations with the bundled updater (`v1.22.0` and later, including `v2.0.x`) can update to the latest 2.1 release through their existing folder registration. Automatic updates must be enabled and Chrome must grant write access.
 
 **Migrating from the HTTPS updater.** Finish or restore any interrupted update in the old installation, then stop its monitoring. Load the new extension-only build once and register its folder in the extension. A folder grant belongs to the origin that received it. Remove the old GitHub Pages origin’s file access in Chrome's site controls. The archived Pages client supports older installations.
 
@@ -22,7 +23,7 @@ The public demo requires no GitHub token. When adapting the updater to a private
 
 ## Demo release schedule
 
-cron-job.org calls `workflow_dispatch` on `main` with `publish=true` at minute zero of each hour in `Asia/Tokyo`. The 2.x series starts at `v2.0.0` and advances one patch at a time, for example `v2.0.1` and `v2.0.2`. The workflow publishes signed updates and an install ZIP at least 60 minutes after the previous release. A request within two minutes of that threshold waits until it is reached. Earlier requests exit before building.
+cron-job.org calls `workflow_dispatch` on `main` with `publish=true` at minute zero of each hour in `Asia/Tokyo`. The current release baseline is `v2.1.0`. Later scheduled releases increment the patch, for example `v2.1.1` and `v2.1.2`. The workflow publishes signed updates and an install ZIP at least 60 minutes after the previous release. A request within two minutes of that threshold waits until it is reached. Earlier requests exit before building.
 
 To stop scheduled releases, disable the cron-job.org job. The job uses a fine-grained token scoped to this repository with read and write access to `Actions`. [Workflow](.github/workflows/hourly-demo-release.yml) · [GitHub dispatch API](https://docs.github.com/en/rest/actions/workflows#create-a-workflow-dispatch-event)
 
@@ -40,16 +41,18 @@ The extension runs while Chrome is open. If automatic updates are enabled when C
 
 ## Troubleshooting the ! badge
 
-Open **Update settings** from the popup.
+Open the extension popup to see what needs attention. Pin the extension from Chrome's extensions menu to see the badge in the toolbar.
 
 | Situation | Action |
 | --- | --- |
-| Permission required | Reauthorize the saved folder. The worker keeps the signed candidate and asks for permission only through a user action in settings. |
+| Permission required | Reauthorize the saved folder. Choose **Allow on every visit** if Chrome offers it. Any verified update waits until Chrome grants write access. |
 | Folder mismatch | Select the exact folder Chrome loaded. The updater checks for local edits and restores the installation record if it detects an identical copy. |
 | Interrupted update | Choose **Restore the previous version**. Restoration also stops monitoring. If the extension's own settings cannot start, restore a known-good distribution ZIP manually. Keep this ZIP outside the installation folder. |
 | Stop or disconnect | **Stop automatic updates** stops future checks. **Disconnect folder** also discards the stored handle and pending candidate. An update already in progress may finish first. |
 
 ## Test results
+
+The 2.1 reauthorization flow was tested in Chrome 157 with simulated file-access permissions. An alarm brought the settings tab forward once. The next alarm left the active tab alone, and granting access again cleared the badge. [Worker regression test](tests/package.test.mjs)
 
 On November 20, 2026 (Japan time), the worker updated a real unpacked installation on Windows 11 and Chrome 157.0.8103.79. With the settings tab closed, two alarms applied `1.0.0 → 1.1.0 → 1.2.0`. After Chrome restarted with the same profile, the extension was still registered and its startup check applied `1.3.0`. Each time, Chrome reported the new manifest version, a fresh worker ran the updated code, and all 16 files on disk matched the signed ZIP byte for byte.
 

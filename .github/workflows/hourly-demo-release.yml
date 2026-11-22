@@ -99,4 +99,4 @@ jobs:
             "$RUNNER_TEMP/demo-release/update.json" "$RUNNER_TEMP/demo-release/update.sig" \
             "$RUNNER_TEMP/demo-release/package-update.json" "$RUNNER_TEMP/demo-release/package-update.sig" \
             --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "$TAG" --latest \
-            --notes "初回インストールで「更新設定」が開きます。フォルダを照合し、書き込みを許可すると自動更新がオンになります。拡張機能内で更新する 1 系からは、これまでの自動更新で移行できます。旧 HTTPS 更新ページ版を使っている場合は、この ZIP を展開して手動で読み込み、フォルダを登録してください。"
+            --notes "初回インストールで「更新設定」が開き、フォルダへの書き込みを許可すると自動更新がオンになります。後で再許可が必要とわかると、設定タブが一度だけ前面に出ます。「保存したフォルダを再許可」を押し、Chrome に「サイトアクセス時は常に許可」が表示されたら選んでください。拡張機能内の自動更新を利用中なら、登録済みのフォルダのまま更新できます。旧 HTTPS 更新ページ版からは、この ZIP を展開して手動で読み込み、フォルダを登録してください。"

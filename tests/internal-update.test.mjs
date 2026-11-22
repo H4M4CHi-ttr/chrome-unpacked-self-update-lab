@@ -30,9 +30,10 @@ test("the release builder starts at the manifest baseline and increments only th
   const next = (tag) => spawnSync(process.execPath, [builder, "--next", tag], { encoding: "utf8" });
 
   for (const [tag, expected] of [
-    ["v1.66.0", "v2.0.0"],
-    ["v2.0.0", "v2.0.1"],
-    ["v2.0.9", "v2.0.10"],
+    ["v1.66.0", "v2.1.0"],
+    ["v2.0.5", "v2.1.0"],
+    ["v2.1.0", "v2.1.1"],
+    ["v2.1.9", "v2.1.10"],
     ["v2.4.17", "v2.4.18"],
   ]) {
     const run = next(tag);
@@ -40,7 +41,7 @@ test("the release builder starts at the manifest baseline and increments only th
     assert.equal(run.stdout.trim(), expected);
   }
 
-  for (const tag of ["2.0.0", "v2.0.01", "v2.0.65535"]) {
+  for (const tag of ["2.1.0", "v2.1.01", "v2.1.65535"]) {
     const run = next(tag);
     assert.equal(run.error, undefined);
     assert.equal(run.status, 1);

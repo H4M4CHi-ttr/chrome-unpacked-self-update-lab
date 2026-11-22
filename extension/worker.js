@@ -17,8 +17,11 @@ async function status(phase, data = {}) {
   const event = { phase, executingVersion: version, ...data };
   await save("status", { at: new Date().toISOString(), ...event });
   await record(event);
-  const attention = ["permission-required", "folder-required", "recovery-required", "error"];
-  await chrome.action.setBadgeText({ text: attention.includes(phase) ? "!" : "" });
+  const attention = ["permission-required", "folder-required", "recovery-required", "error"].includes(phase);
+  const noApplicableUpdate = phase === "up-to-date" || phase === "package-unavailable";
+  const needsGrant = noApplicableUpdate && await load("enabled") &&
+    await permissionOf(await load("directory")) !== "granted";
+  await chrome.action.setBadgeText({ text: attention || needsGrant ? "!" : "" });
 }
 
 async function ensureAlarm() {
@@ -179,8 +182,31 @@ async function run(task, reason) {
   });
 }
 
+async function showSettingsForReauthorization() {
+  if (await load("recovery") || await load("blocked")) return;
+  const permission = await permissionOf(await load("directory"));
+  if (permission === "not-selected") return;
+  const shown = await load("reauthorizationShown");
+  if (permission === "granted") {
+    if (shown) await save("reauthorizationShown", false);
+    return;
+  }
+  await chrome.action.setBadgeText({ text: "!" });
+  if (shown) return;
+  try {
+    await chrome.runtime.openOptionsPage();
+    await save("reauthorizationShown", true);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
 function automaticCheck(reason) {
-  void run(async () => { if (await load("enabled")) await check(reason); }, reason).catch(console.error);
+  void run(async () => {
+    if (!await load("enabled")) return;
+    await showSettingsForReauthorization();
+    await check(reason);
+  }, reason).catch(console.error);
 }
 chrome.alarms.onAlarm.addListener((alarm) => { if (alarm.name === CHECK_ALARM) automaticCheck("alarm"); });
 chrome.runtime.onStartup.addListener(() => automaticCheck("browser-startup"));
@@ -217,6 +243,7 @@ async function command(kind) {
     case "apply": await applyPending("manual-apply"); return true;
     case "folder-ready": {
       if (await load("recovery")) return true;
+      if (await load("reauthorizationShown")) await save("reauthorizationShown", false);
       let enabled = await load("enabled");
       if (enabled === undefined && !await load("blocked") && await permissionOf(await load("directory")) === "granted") {
         enabled = true;

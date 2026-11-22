@@ -4,7 +4,7 @@ import { cp, mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
-import { REPOSITORY } from "../extension/config.js";
+import { CHECK_ALARM, REPOSITORY } from "../extension/config.js";
 import { sha256 } from "../extension/core.js";
 import { PACKAGE_FORMAT, assertCompatibleManifest, hashFiles, packageInventory, replacePackage, restorePackage } from "../extension/package.js";
 import { downloadPackage, latestRelease, unpackPackage, verifyPackageManifest } from "../extension/release.js";
@@ -197,7 +197,8 @@ test("the internal worker holds a signed update, protects an identical copy and 
   const { raw, signature, zip } = await signedPackage(after, { keyPair });
   const assets = new Map([["package-update.json", raw], ["package-update.sig", signature], ["auto-update-https.zip", zip]]);
   const disk = fakeDirectory(before), copy = fakeDirectory(before);
-  let permission = "prompt", reloads = 0, optionsOpened = 0, receiver, alarm, onInstalled;
+  let permission = "prompt", reloads = 0, optionsOpened = 0, receiver, alarm, onInstalled, onAlarm;
+  let badge = "";
   disk.directory.queryPermission = async () => permission;
   const state = new Map();
   const events = [];
@@ -219,10 +220,10 @@ test("the internal worker holds a signed update, protects an identical copy and 
       onInstalled: { addListener: (listener) => { onInstalled = listener; } },
       openOptionsPage: async () => { optionsOpened++; },
     },
-    action: { async setBadgeText() {} },
+    action: { async setBadgeText({ text }) { badge = text; } },
     alarms: {
       get: async () => alarm, create: async (_, info) => { alarm = info; }, clear: async () => { alarm = null; },
-      onAlarm: { addListener() {} },
+      onAlarm: { addListener: (listener) => { onAlarm = listener; } },
     },
   };
 
@@ -319,6 +320,39 @@ test("the internal worker holds a signed update, protects an identical copy and 
   assert.equal(updated.manifestVersion, newVersion);
   assert.equal(updated.receipt.status, "executed");
   assert.equal(state.get("recovery"), null);
+
+  await t.test("foregrounds settings once per period without write access", async () => {
+    const tick = () => {
+      onAlarm({ name: CHECK_ALARM });
+      return command("status");
+    };
+
+    permission = "prompt";
+    state.set("retryAt", Date.now() + 60_000);
+    await tick();
+    assert.equal(optionsOpened, 2);
+    assert.equal(badge, "!");
+    state.delete("retryAt");
+    assert.equal((await tick()).status.phase, "up-to-date");
+    assert.equal(optionsOpened, 2);
+    assert.equal(badge, "!");
+
+    await boot(3);
+    await tick();
+    assert.equal(optionsOpened, 2);
+
+    permission = "granted";
+    await command("folder-ready");
+    assert.equal(badge, "");
+    permission = "prompt";
+    await tick();
+    assert.equal(optionsOpened, 3);
+
+    await command("disable");
+    await tick();
+    assert.equal(optionsOpened, 3);
+    assert.equal(badge, "");
+  });
 });
 
 async function transaction() {

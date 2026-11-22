@@ -20,8 +20,9 @@ const fullPage = Boolean(await chrome.tabs.getCurrent());
 document.body.classList.toggle("tab", fullPage);
 $("#folder-settings").hidden = !fullPage;
 $("#version-details").open = !fullPage;
-$("#updater").hidden = fullPage;
-$("#updater").onclick = () => { void chrome.runtime.openOptionsPage().catch(showError); };
+const updater = $("#updater");
+updater.hidden = fullPage;
+updater.onclick = () => { void chrome.runtime.openOptionsPage().catch(showError); };
 
 async function send(kind) {
   const result = await chrome.runtime.sendMessage({ kind });
@@ -42,13 +43,18 @@ async function refresh() {
   const needsGrant = !needsFolder && perm !== "granted";
   let guide = "";
   if (backup) guide = "中断した更新を、設定画面で旧版に戻してください。";
-  else if (needsFolder) guide = "Chrome に読み込んだときと同じフォルダを選び、読み書きを許可してください。";
-  else if (needsGrant) guide = "保存したフォルダへの読み書きを再許可してください。";
-  if (guide && !backup && state.enableOnFirstGrant) {
-    guide += "\n許可すると自動更新がオンになります。あとから停止できます。";
+  else if (needsFolder) {
+    guide = "Chrome に読み込んだときと同じフォルダを選び、読み書きを許可してください。";
+    if (state.enableOnFirstGrant) {
+      guide += "\n登録すると自動更新がオンになります。後で再許可が必要になると「更新設定」が開きます。Chrome に「サイトアクセス時は常に許可」が表示されたら選んでください。";
+    }
+  } else if (needsGrant) {
+    guide = state.enabled ? "自動更新はフォルダの再許可を待っています。" : "保存したフォルダへの書き込みを許可してください。";
+    guide += "\nChrome の確認画面に「サイトアクセス時は常に許可」が表示されたら選んでください。登録済みのフォルダをそのまま使えます。";
   }
   $("#folder-guide").textContent = guide;
-  $("#updater").classList.toggle("primary", Boolean(guide));
+  updater.textContent = needsGrant && !backup ? "再許可画面を開く" : "更新設定を開く";
+  updater.classList.toggle("primary", Boolean(guide));
 
   const permissionText = { granted: "許可あり", prompt: "再許可が必要", denied: "拒否", "not-selected": "未登録" };
   $("#permission").textContent = (permissionText[perm] ?? perm) + (directory ? "（" + directory.name + "）" : "");
@@ -119,7 +125,7 @@ action("pick", async () => {
 });
 action("grant", async () => {
   if (!directory || await directory.requestPermission({ mode: "readwrite" }) !== "granted") {
-    throw new Error("書き込みを許可するか、拡張機能フォルダを選び直してください。");
+    throw new Error("書き込みは許可されませんでした。「保存したフォルダを再許可」からやり直せます。");
   }
   await send("folder-ready");
 });
