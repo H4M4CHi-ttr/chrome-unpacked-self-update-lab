@@ -4,6 +4,10 @@ English · [日本語](README.ja.MD)
 
 This project demonstrates how an unpacked Manifest V3 Chrome extension can update itself from GitHub Releases. While Chrome is running and write access is granted, the updater can apply a signed package and reload the extension so Chrome sees the new manifest version, scripts, and assets. The demo runs without the Chrome Web Store, Native Messaging, or an external program.
 
+> **Do not use this self-update mechanism for extensions distributed through the Chrome Web Store.**
+>
+> The store's Manifest V3 rules require reviewers to be able to determine an extension's full functionality from the submitted code. This demo verifies a signed package from GitHub Releases, saves its JavaScript to disk, and runs it after the extension reloads. That code comes from outside the package submitted for review. [Additional Requirements for Manifest V3](https://developer.chrome.com/docs/webstore/program-policies/mv3-requirements)
+
 Follow the [demo setup](#try-the-demo) to get started. To adapt the updater to your own extension, see the [porting guide](PORTING.md). AI agents can start with [AGENTS.md](AGENTS.md). Both documents are in Japanese.
 
 ## Try the demo
@@ -68,7 +72,7 @@ The following reports cover the earlier implementations in real Chrome.
 - In the direct-write experiment, signature verification passed and the folder permission returned to `prompt` after the extension reloaded. [Direct-write experiment](RESULTS.md)
 - The permission isolation experiment recorded what happens after a full Chrome restart when the HTTPS updater has folder access. It also compares this approach with updating the module without reloading the extension. [Permission isolation experiment](experiments/permission-isolation/RESULTS.md)
 
-Automatic updates cover the files in the signed list, including changes to the manifest's version, name, description, and icons. Changes to permissions, extension identity, the signing key, or the settings entry point require manually loading a new ZIP. The release still includes `update.zip` for older `active.js`-only installations. Do not use this approach for Chrome Web Store distribution, even with signed releases. [Chrome's guidance on remotely hosted code](https://developer.chrome.com/docs/extensions/develop/migrate/remote-hosted-code)
+Automatic updates cover the files in the signed list, including changes to the manifest's version, name, description, and icons. Changes to permissions, extension identity, the signing key, or the settings entry point require manually loading a new ZIP. The release still includes `update.zip` for older `active.js`-only installations.
 
 ## Tests and installation record
 
